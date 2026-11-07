@@ -66,6 +66,7 @@ services:
         condition: service_completed_successfully
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-radar}:${POSTGRES_PASSWORD:-radar}@postgres:5432/${POSTGRES_DB:-radar}?sslmode=disable
+      PIPELINE_JOBS: ${PIPELINE_JOBS:-}
     restart: "no"
 
   # API REST somente leitura sobre a mart. Só precisa das tabelas existirem:
