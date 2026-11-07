@@ -71,6 +71,15 @@ Qualidade e clareza importam mais que quantidade de features.
   gráficos (sem zoom por gráfico); tabela acessível ao lado de cada gráfico.
 - Web: testes de funções puras com `node --test` (Node 26 roda TS direto,
   imports com extensão `.ts`); imagem Docker com `output: "standalone"`.
+- Deploy (tudo em São Paulo): Neon Free (Postgres 16, `sa-east-1`), API no
+  Fly.io (`gru`, auto-stop, menor máquina), web na Vercel Hobby (`gru1`, raiz
+  `web`). Coleta em produção pelo workflow manual `data.yml`.
+- Neon: usar a connection string DIRETA (sem `-pooler`): o pooler recusa o
+  parâmetro `default_transaction_read_only` que a API envia ao conectar.
+  O Neon dorme após 5 min sem consultas e derruba as conexões, por isso o
+  pool da API fecha conexões ociosas após 1 min.
+- Plano grátis do Neon tem 100 CU-horas/mês: a API terá cache em memória
+  (`api/internal/cache`) para não acordar o banco a cada visita.
 
 ## Regra de arquitetura
 Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco

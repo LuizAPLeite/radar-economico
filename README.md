@@ -114,6 +114,22 @@ As queries ficam em `api/queries/` e o código Go correspondente é gerado pelo
 docker run --rm -v "${PWD}:/src" -w /src/api sqlc/sqlc:1.31.1 generate
 ```
 
+## Deploy
+
+Tudo em São Paulo, para cada visita fazer o caminho Vercel → API → banco
+sem sair do Brasil.
+
+| Parte | Onde | Como publica |
+|---|---|---|
+| Banco | [Neon](https://neon.com) (Postgres 16, AWS `sa-east-1`) | as migrations rodam nos workflows |
+| Dados | GitHub Actions ([`data.yml`](.github/workflows/data.yml)) | disparo manual: migrations → coletor → pipeline |
+| API | [Fly.io](https://fly.io) ([`api/fly.toml`](api/fly.toml), região `gru`) | `fly deploy --config api/fly.toml api` |
+| Dashboard | [Vercel](https://vercel.com) (pasta `web`, região `gru1`) | a cada push na `main` |
+
+Segredos nunca entram no código: `DATABASE_URL` (connection string **direta**
+do Neon, sem `-pooler`, com `sslmode=require`) fica nos secrets do GitHub e do
+Fly.io; `API_URL` (endereço da API no Fly.io) fica nas variáveis da Vercel.
+
 ## Migrations
 
 Arquivos SQL numerados em `db/migrations/` (`NNNNNN_nome.up.sql` / `.down.sql`),
