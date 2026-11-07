@@ -1,0 +1,27 @@
+# Gera código Go tipado a partir das queries em queries/.
+# Rodar (da raiz do repositório):
+#   docker run --rm -v "${PWD}:/src" -w /src/api sqlc/sqlc:1.31.1 generate
+version: "2"
+sql:
+  - engine: "postgresql"
+    # O sqlc lê as migrations do golang-migrate para conhecer o schema
+    # (ignora os arquivos .down.sql).
+    schema: "../db/migrations"
+    queries: "queries"
+    gen:
+      go:
+        package: "db"
+        out: "internal/db"
+        sql_package: "pgx/v5"
+        # Só gera structs das tabelas usadas nas queries: a API não precisa
+        # conhecer raw nem staging.
+        omit_unused_structs: true
+        overrides:
+          # numeric fica exato no banco; na API vira float64, porque o JSON
+          # (e o JavaScript do front) só tem um tipo de número, o double.
+          - db_type: "pg_catalog.numeric"
+            go_type: "float64"
+          - db_type: "date"
+            go_type: "time.Time"
+          - db_type: "timestamptz"
+            go_type: "time.Time"
