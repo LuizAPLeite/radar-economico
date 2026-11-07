@@ -36,6 +36,9 @@ func NewRouter(store Store, logger *slog.Logger, openAPISpec []byte) http.Handle
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/indicators", h.listIndicators)
 		r.Get("/indicators/{id}/values", h.listIndicatorValues)
+		r.Get("/fuels", h.listFuels)
+		r.Get("/fuels/{id}/prices", h.listFuelPrices)
+		r.Get("/fuels/{id}/municipalities", h.listFuelMunicipalities)
 	})
 	return r
 }

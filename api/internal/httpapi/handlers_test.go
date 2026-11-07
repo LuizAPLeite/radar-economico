@@ -18,8 +18,11 @@ import (
 )
 
 // fakeStore faz o papel do banco: devolve o que o teste configurou e
-// registra os parâmetros recebidos.
+// registra os parâmetros recebidos. Ele embute um fakeFuelStore (ver
+// fuels_test.go): os métodos de combustíveis vêm "de graça" com o campo.
 type fakeStore struct {
+	fakeFuelStore
+
 	indicators []db.ListIndicatorsRow
 	listErr    error
 

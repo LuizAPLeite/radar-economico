@@ -16,10 +16,18 @@ import (
 	"github.com/LuizAPLeite/radar-economico/api/internal/db"
 )
 
-// Store é o que os handlers precisam do banco. O *db.Queries gerado pelo
-// sqlc já tem esses métodos, então satisfaz a interface sem declarar nada;
-// nos testes, uma versão falsa ocupa o lugar dele.
+// Store é tudo o que os handlers precisam do banco. Uma interface pode
+// "embutir" outras: Store tem todos os métodos de IndicatorStore e de
+// FuelStore (ver fuels.go). O *db.Queries gerado pelo sqlc já tem esses
+// métodos, então satisfaz a interface sem declarar nada; nos testes, uma
+// versão falsa ocupa o lugar dele.
 type Store interface {
+	IndicatorStore
+	FuelStore
+}
+
+// IndicatorStore é o que os handlers de indicadores precisam do banco.
+type IndicatorStore interface {
 	ListIndicators(ctx context.Context) ([]db.ListIndicatorsRow, error)
 	GetIndicator(ctx context.Context, id string) (db.MartIndicator, error)
 	ListIndicatorValues(ctx context.Context, arg db.ListIndicatorValuesParams) ([]db.ListIndicatorValuesRow, error)
