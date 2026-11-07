@@ -85,6 +85,17 @@ Qualidade e clareza importam mais que quantidade de features.
 - Plano grátis do Neon tem 100 CU-horas/mês: antes de publicar, a API precisa
   de cache em memória (`api/internal/cache`) para não acordar o banco a cada visita.
 
+- Collector com várias fontes (`bcb_sgs`, `ibge`, `anp`) em goroutines, cada
+  uma com sua linha em `raw.collection_runs`; `COLLECTOR_SOURCES` escolhe
+  quais rodar. Pacote `fetch` (GET com retry/backoff) compartilhado.
+- IBGE (`raw.ibge_responses`) e ANP (`raw.anp_files`) só gravam quando o
+  SHA-256 do conteúdo muda. Arquivos da ANP guardados intactos, compactados
+  com gzip (coluna com STORAGE EXTERNAL, sem recompressão do Postgres).
+- ANP: os nomes dos arquivos mensais não seguem padrão e meses podem faltar;
+  o collector descobre os links lendo a página de dados abertos. O servidor
+  recusa HEAD (403) e é lento (~200 KB/s): só GET, 2 downloads por vez,
+  coleta incremental (só baixa meses novos + os mais recentes).
+
 ## Regra de arquitetura
 Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
 (raw → staging → mart). A API só lê `mart`.
