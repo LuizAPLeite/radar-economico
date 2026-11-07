@@ -42,5 +42,17 @@ services:
       - up
     restart: "no"
 
+  # Coleta as séries do Banco Central uma vez e encerra.
+  collector:
+    build: ./collector
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-radar}:${POSTGRES_PASSWORD:-radar}@postgres:5432/${POSTGRES_DB:-radar}?sslmode=disable
+      SGS_START_DATE: ${SGS_START_DATE:-2000-01-01}
+      COLLECTOR_CONCURRENCY: ${COLLECTOR_CONCURRENCY:-4}
+    restart: "no"
+
 volumes:
   pgdata:
