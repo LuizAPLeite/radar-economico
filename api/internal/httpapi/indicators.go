@@ -86,21 +86,21 @@ func (h *handlers) health(w http.ResponseWriter, _ *http.Request) {
 
 // listIndicators responde GET /v1/indicators com todos os indicadores e o
 // valor mais recente de cada um.
-//
-// TODO(LuizAPLeite): implementar. Os testes em indicators_list_test.go
-// descrevem o resultado esperado. Use listIndicatorValues, logo abaixo,
-// como modelo. Passos:
-//
-//  1. Buscar as linhas com h.store.ListIndicators(r.Context()).
-//  2. Se vier erro, chamar h.internalError(w, r, err) e sair com return.
-//  3. Criar a lista de resposta com make([]indicatorJSON, 0, len(rows)).
-//  4. Para cada linha: converter row.MartIndicator com indicatorFromModel,
-//     criar o ponto com newPoint(row.LastDate, row.LastValue) e guardar o
-//     ENDEREÇO dele no campo Latest (o operador & dá o endereço de uma
-//     variável). Depois, append na lista.
-//  5. Responder com writeJSON(w, http.StatusOK, listResponse{Data: lista}).
 func (h *handlers) listIndicators(w http.ResponseWriter, r *http.Request) {
-	writeError(w, http.StatusNotImplemented, "not_implemented", "rota em construção")
+	rows, err := h.store.ListIndicators(r.Context())
+	if err != nil {
+		h.internalError(w, r, err)
+		return
+	}
+
+	data := make([]indicatorJSON, 0, len(rows))
+	for _, row := range rows {
+		ind := indicatorFromModel(row.MartIndicator)
+		latest := newPoint(row.LastDate, row.LastValue)
+		ind.Latest = &latest
+		data = append(data, ind)
+	}
+	writeJSON(w, http.StatusOK, listResponse{Data: data})
 }
 
 // listIndicatorValues responde GET /v1/indicators/{id}/values?from=&to=.
