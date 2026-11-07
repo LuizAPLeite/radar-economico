@@ -4,6 +4,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -20,6 +21,12 @@ func Connect(ctx context.Context, url string) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("postgres: DATABASE_URL inválida: %w", err)
 	}
 	cfg.ConnConfig.RuntimeParams["default_transaction_read_only"] = "on"
+
+	// O Neon (produção) desliga o banco após 5 min sem consultas e derruba as
+	// conexões abertas. Fechando as ociosas antes disso, a próxima requisição
+	// abre uma conexão nova, em vez de tropeçar numa já derrubada.
+	cfg.MaxConnIdleTime = time.Minute
+	cfg.HealthCheckPeriod = 30 * time.Second
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
