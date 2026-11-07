@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/LuizAPLeite/radar-economico/collector/internal/anp"
 	"github.com/LuizAPLeite/radar-economico/collector/internal/sgs"
 )
 
@@ -90,6 +91,47 @@ func (s *Store) SaveIBGE(ctx context.Context, runID int64, dataset, url, sha256 
 		return false, fmt.Errorf("store: gravando ibge %s: %w", dataset, err)
 	}
 	return tag.RowsAffected() == 1, nil
+}
+
+// LatestANPHashes devolve, para cada arquivo da ANP (grupo e mês), o SHA-256
+// da versão mais recente guardada.
+func (s *Store) LatestANPHashes(ctx context.Context) (map[anp.Key]string, error) {
+	// DISTINCT ON fica com a primeira linha de cada (grupo, mês) segundo o
+	// ORDER BY: a mais recente.
+	rows, err := s.pool.Query(ctx,
+		`SELECT DISTINCT ON (product_group, ref_month) product_group, ref_month, sha256
+		   FROM raw.anp_files
+		  ORDER BY product_group, ref_month, fetched_at DESC, id DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("store: lendo hashes da ANP: %w", err)
+	}
+	defer rows.Close()
+
+	latest := make(map[anp.Key]string)
+	for rows.Next() {
+		var (
+			group, sha string
+			month      time.Time
+		)
+		if err := rows.Scan(&group, &month, &sha); err != nil {
+			return nil, fmt.Errorf("store: lendo hashes da ANP: %w", err)
+		}
+		latest[anp.File{Group: group, Month: month}.Key()] = sha
+	}
+	return latest, rows.Err()
+}
+
+// SaveANPFile grava um arquivo da ANP já compactado.
+func (s *Store) SaveANPFile(ctx context.Context, runID int64, f anp.File, sha256 string, size int64, gz []byte) error {
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO raw.anp_files (run_id, product_group, ref_month, url, sha256, size_bytes, content_gzip)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		runID, f.Group, f.Month, f.URL, sha256, size, gz,
+	)
+	if err != nil {
+		return fmt.Errorf("store: gravando arquivo da ANP %s %s: %w", f.Group, f.Key().Month, err)
+	}
+	return nil
 }
 
 // dateOrNil converte a data zero (consulta sem filtro) em NULL.

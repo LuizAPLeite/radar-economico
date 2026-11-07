@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/LuizAPLeite/radar-economico/collector/internal/anp"
 	"github.com/LuizAPLeite/radar-economico/collector/internal/sgs"
 )
 
@@ -67,6 +68,37 @@ func TestStore_SaveIBGESkipsUnchangedContent(t *testing.T) {
 	}
 	if n != 2 {
 		t.Errorf("linhas gravadas = %d, quer 2", n)
+	}
+}
+
+func TestStore_ANPFiles(t *testing.T) {
+	s, pool := newTestStore(t)
+	ctx := context.Background()
+
+	runID, err := s.StartRun(ctx, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM raw.anp_files WHERE run_id = $1`, runID)
+		_, _ = pool.Exec(ctx, `DELETE FROM raw.collection_runs WHERE id = $1`, runID)
+	})
+
+	// Um mês bem no futuro, para não se misturar com dados reais do banco de desenvolvimento.
+	f := anp.File{Group: anp.GroupDieselGNV, Month: time.Date(2099, time.March, 1, 0, 0, 0, 0, time.UTC), URL: "http://anp/x.csv"}
+	for _, sha := range []string{"versao-1", "versao-2"} {
+		if err := s.SaveANPFile(ctx, runID, f, sha, 10, []byte{0x1f, 0x8b}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	latest, err := s.LatestANPHashes(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A chave lida do banco tem que bater com a montada no Go (mês como texto).
+	if got := latest[f.Key()]; got != "versao-2" {
+		t.Errorf("hash mais recente de %+v = %q, quer \"versao-2\"", f.Key(), got)
 	}
 }
 
