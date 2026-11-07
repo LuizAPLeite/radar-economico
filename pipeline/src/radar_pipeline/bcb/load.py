@@ -2,9 +2,9 @@
 
 import polars as pl
 import psycopg
-from psycopg import sql
 
 from radar_pipeline.bcb.indicators import INDICATORS
+from radar_pipeline.pg import copy_frame
 
 _UPSERT_INDICATOR = """
 INSERT INTO mart.indicators
@@ -32,30 +32,15 @@ def replace_all(
     """
     with conn.transaction(), conn.cursor() as cur:
         cur.execute("DELETE FROM staging.bcb_sgs_observations")
-        _copy(cur, ("staging", "bcb_sgs_observations"), staging)
+        copy_frame(cur, ("staging", "bcb_sgs_observations"), staging)
 
         cur.executemany(
             _UPSERT_INDICATOR,
             [(i.id, i.name, i.unit, i.frequency, str(i.sgs_code), run_id) for i in INDICATORS],
         )
         cur.execute("DELETE FROM mart.indicator_values")
-        _copy(cur, ("mart", "indicator_values"), mart_values)
+        copy_frame(cur, ("mart", "indicator_values"), mart_values)
 
         # Depois de trocar a tabela inteira, as estatísticas do planejador
         # ficam desatualizadas até o autovacuum passar. ANALYZE resolve na hora.
         cur.execute("ANALYZE staging.bcb_sgs_observations, mart.indicator_values")
-
-
-def _copy(cur: psycopg.Cursor, table: tuple[str, str], df: pl.DataFrame) -> None:
-    """Insere o DataFrame com COPY, bem mais rápido que um INSERT por linha.
-
-    Nomes de tabela e coluna entram via sql.Identifier, que os escapa
-    corretamente; valores nunca são concatenados no SQL.
-    """
-    stmt = sql.SQL("COPY {table} ({columns}) FROM STDIN").format(
-        table=sql.Identifier(*table),
-        columns=sql.SQL(", ").join(sql.Identifier(c) for c in df.columns),
-    )
-    with cur.copy(stmt) as copy:
-        for row in df.iter_rows():
-            copy.write_row(row)
