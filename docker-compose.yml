@@ -80,5 +80,17 @@ services:
       - "${API_PORT:-8080}:8080"
     restart: unless-stopped
 
+  # Dashboard. O servidor do Next chama a API pela rede interna do Compose;
+  # o navegador só fala com o Next.
+  web:
+    build: ./web
+    depends_on:
+      - api
+    environment:
+      API_URL: http://api:8080
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    restart: unless-stopped
+
 volumes:
   pgdata:
