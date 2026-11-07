@@ -2,14 +2,18 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "node --test \"src/**/*.test.ts\""
   },
   "dependencies": {
+    "echarts": "6.1.0",
+    "echarts-for-react": "3.0.6",
     "next": "16.4.5",
     "react": "19.3.0",
     "react-dom": "19.3.0"
