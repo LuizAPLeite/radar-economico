@@ -19,11 +19,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/LuizAPLeite/radar-economico/collector/internal/fetch"
 )
 
 // DefaultBaseURL é o endereço público da API SGS.
@@ -97,10 +98,10 @@ func (c *Client) Fetch(ctx context.Context, req Request) (Response, error) {
 	var lastErr error
 	for attempt := 0; attempt <= c.MaxRetries; attempt++ {
 		if attempt > 0 {
-			wait := c.backoff(attempt)
+			wait := fetch.Backoff(c.BaseBackoff, attempt)
 			c.Logger.Warn("repetindo consulta ao SGS",
 				"series", req.SeriesCode, "attempt", attempt, "wait", wait, "err", lastErr)
-			if err := sleep(ctx, wait); err != nil {
+			if err := fetch.Sleep(ctx, wait); err != nil {
 				return Response{}, err
 			}
 		}
@@ -174,26 +175,6 @@ func (c *Client) buildURL(req Request) string {
 		q.Set("dataFinal", req.End.Format(dateLayout))
 	}
 	return c.BaseURL + "/dados/serie/bcdata.sgs." + strconv.Itoa(req.SeriesCode) + "/dados?" + q.Encode()
-}
-
-// backoff devolve BaseBackoff * 2^(attempt-1), com até 20% de variação
-// aleatória (jitter) para que coletas paralelas não repitam todas juntas.
-func (c *Client) backoff(attempt int) time.Duration {
-	d := c.BaseBackoff << (attempt - 1)
-	jitter := time.Duration(rand.Int64N(int64(d)/5 + 1))
-	return d + jitter
-}
-
-// sleep espera d, mas retorna antes se o contexto for cancelado.
-func sleep(ctx context.Context, d time.Duration) error {
-	t := time.NewTimer(d)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-t.C:
-		return nil
-	}
 }
 
 // isNoValues reconhece o 404 que significa "período sem dados",
