@@ -1,0 +1,31 @@
+[project]
+name = "radar-pipeline"
+version = "0.1.0"
+description = "Limpeza, validação e análise dos dados do Radar Econômico"
+requires-python = ">=3.13"
+dependencies = [
+    "pandera[polars]>=0.35.0",
+    "polars>=2.1.0",
+]
+
+[project.scripts]
+radar-pipeline = "radar_pipeline:main"
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "ruff>=0.17.4",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
