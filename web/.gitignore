@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# copiado de node_modules antes do dev/build (scripts/copy-maplibre-worker.mjs)
+/public/vendor/
+
 # production
 /build
 
