@@ -20,6 +20,16 @@
   --hover-wash: rgba(11, 11, 11, 0.05);
   --series-1: #2a78d6;
   --series-negative: #e34948;
+  /* Mapa: escala sequencial (um só tom; barato → caro), validada com o script
+     do guia contra a cor da terra (--map-land). */
+  --seq-1: #6da7ec;
+  --seq-2: #3987e5;
+  --seq-3: #256abf;
+  --seq-4: #184f95;
+  --seq-5: #0d366b;
+  --map-land: #f1f0ec;
+  --map-land-selected: #e1e0d9;
+  --map-border: #c3c2b7;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -36,6 +46,16 @@
     --hover-wash: rgba(255, 255, 255, 0.06);
     --series-1: #3987e5;
     --series-negative: #e66767;
+    /* No escuro a escala se inverte: o mais caro é o mais claro, o que mais
+       contrasta com o fundo escuro. */
+    --seq-1: #1c5cab;
+    --seq-2: #2a78d6;
+    --seq-3: #5598e7;
+    --seq-4: #86b6ef;
+    --seq-5: #b7d3f6;
+    --map-land: #232322;
+    --map-land-selected: #31312f;
+    --map-border: #4a4a47;
   }
 }
 

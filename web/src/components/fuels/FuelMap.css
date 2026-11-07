@@ -1,0 +1,53 @@
+/*
+ * Ajustes no visual padrão do MapLibre para seguir o tema da página.
+ * Importado logo depois de maplibre-gl.css (ver FuelMap.tsx), e com o prefixo
+ * .maplibregl-map para as regras valerem mais que as da biblioteca.
+ */
+
+/* A biblioteca fixa Helvetica; o mapa usa a fonte da página. */
+.maplibregl-map {
+  font: inherit;
+}
+
+/* Balão: as mesmas cores e cantos dos tooltips dos gráficos. */
+.maplibregl-map .maplibregl-popup-content {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  font-size: 13px;
+}
+.maplibregl-map .maplibregl-popup-tip {
+  display: none;
+}
+
+/* Botões de zoom e créditos com as cores do tema. */
+.maplibregl-map .maplibregl-ctrl-group {
+  background: var(--surface);
+  border-radius: 8px;
+}
+.maplibregl-map .maplibregl-ctrl-group:not(:empty) {
+  box-shadow: 0 0 0 1px var(--hairline);
+}
+.maplibregl-map .maplibregl-ctrl-group button + button {
+  border-top-color: var(--hairline);
+}
+.maplibregl-map .maplibregl-ctrl.maplibregl-ctrl-attrib,
+.maplibregl-map .maplibregl-ctrl-attrib.maplibregl-compact {
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 11px;
+}
+.maplibregl-map .maplibregl-ctrl-attrib a {
+  color: inherit;
+}
+
+/* Os ícones da biblioteca são desenhos escuros: no tema escuro, invertidos. */
+@media (prefers-color-scheme: dark) {
+  .maplibregl-map .maplibregl-ctrl-icon,
+  .maplibregl-map .maplibregl-ctrl-attrib-button {
+    filter: invert(1);
+  }
+}
