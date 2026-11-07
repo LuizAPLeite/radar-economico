@@ -2,6 +2,9 @@ package sgs
 
 import "time"
 
+// MaxDailyWindowYears é a maior janela que a API aceita em séries diárias.
+const MaxDailyWindowYears = 10
+
 // Window é um intervalo de datas fechado: inclui Start e End.
 type Window struct {
 	Start time.Time
