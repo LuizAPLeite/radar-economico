@@ -1,26 +1,59 @@
 @import "tailwindcss";
 
+/*
+ * Tokens de cor por papel (superfície, texto, série), nos modos claro e escuro.
+ * Valores da paleta de referência do guia de visualização, validados com o
+ * script dele (separação para daltonismo e contraste) nos dois modos.
+ * Os componentes usam os papéis, nunca o hex direto; o gráfico (canvas do
+ * ECharts) lê estas mesmas variáveis em tempo de execução.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --hairline: rgba(11, 11, 11, 0.1);
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --hover-wash: rgba(11, 11, 11, 0.05);
+  --series-1: #2a78d6;
+  --series-negative: #e34948;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --hairline: rgba(255, 255, 255, 0.1);
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --hover-wash: rgba(255, 255, 255, 0.06);
+    --series-1: #3987e5;
+    --series-negative: #e66767;
   }
 }
 
+/* Expõe os tokens como cores do Tailwind: bg-surface, text-ink, border-hairline... */
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-hairline: var(--hairline);
+  --color-hover: var(--hover-wash);
+  --color-series: var(--series-1);
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--page);
+  color: var(--ink);
 }

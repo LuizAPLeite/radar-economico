@@ -1,10 +1,41 @@
+import { Suspense } from "react";
+
+import { Dashboard, DashboardSkeleton } from "@/components/Dashboard";
+
+/**
+ * O cabeçalho e o rodapé são estáticos e entram no HTML gerado no build.
+ * O <Suspense> marca a parte que depende da API: no build ela vira o
+ * esqueleto (fallback), e os dados entram a cada requisição. Por isso o
+ * `next build` não precisa da API no ar.
+ */
 export default function Home() {
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center gap-4 px-4 py-16">
-      <h1 className="text-3xl font-semibold tracking-tight">Radar Econômico</h1>
-      <p className="text-zinc-600 dark:text-zinc-400">
-        Selic, IPCA, dólar e preços de combustíveis do Brasil. Em construção.
-      </p>
-    </main>
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-10 sm:py-14">
+      <header className="mb-8">
+        <h1 className="text-3xl font-semibold tracking-tight text-ink">Radar Econômico</h1>
+        <p className="mt-2 max-w-2xl text-ink-2">
+          Selic, inflação e dólar, direto do Banco Central: coletados, validados e servidos por um
+          pipeline de dados próprio.
+        </p>
+      </header>
+
+      <main className="flex-1">
+        <Suspense fallback={<DashboardSkeleton />}>
+          <Dashboard />
+        </Suspense>
+      </main>
+
+      <footer className="mt-12 border-t border-hairline pt-6 text-sm text-ink-2">
+        Fonte: Banco Central do Brasil, Sistema Gerenciador de Séries Temporais (SGS). Código aberto
+        no{" "}
+        <a
+          className="text-ink underline underline-offset-4 hover:no-underline"
+          href="https://github.com/LuizAPLeite/radar-economico"
+        >
+          GitHub
+        </a>
+        .
+      </footer>
+    </div>
   );
 }
