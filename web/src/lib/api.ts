@@ -34,8 +34,12 @@ function apiUrl(): string {
   return process.env.API_URL ?? "http://localhost:8080";
 }
 
+// Em produção, a API (Fly.io) e o banco (Neon) desligam quando ficam sem uso;
+// a primeira requisição depois disso leva alguns segundos para acordar os dois.
+const TIMEOUT_MS = 10_000;
+
 async function getJSON<T>(path: string): Promise<T> {
-  const res = await fetch(apiUrl() + path, { signal: AbortSignal.timeout(5_000) });
+  const res = await fetch(apiUrl() + path, { signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!res.ok) {
     throw new Error(`a API respondeu ${res.status} em ${path}`);
   }
