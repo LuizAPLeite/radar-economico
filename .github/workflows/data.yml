@@ -1,0 +1,49 @@
+name: Coleta de dados (produção)
+
+# Disparo manual: aba Actions → "Coleta de dados (produção)" → Run workflow.
+# O agendamento diário (cron) entra na Fase 3.
+on:
+  workflow_dispatch:
+
+# Uma coleta por vez; uma nova espera a anterior terminar, nunca a interrompe.
+concurrency:
+  group: data-production
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    name: Migrations, coleta e pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Connection string DIRETA do Neon (sem "-pooler"), cadastrada em
+      # Settings → Secrets and variables → Actions. O GitHub esconde o valor nos logs.
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Confere o secret
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Cadastre o secret DATABASE_URL em Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+      - name: Migrations
+        run: |
+          docker run --rm -v "$PWD/db/migrations:/migrations:ro" \
+            migrate/migrate:v4.18.3 -path=/migrations -database="$DATABASE_URL" up
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "**/go.sum"
+      - name: Coleta (API SGS do Banco Central)
+        run: go run ./collector
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Pipeline (raw → staging → mart)
+        working-directory: pipeline
+        run: uv run --locked --no-dev radar-pipeline
