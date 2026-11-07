@@ -118,9 +118,13 @@ fica em [`api/openapi.yaml`](api/openapi.yaml) e é servida em `/openapi.yaml`.
 | `GET /health` | `{"status":"ok"}` |
 | `GET /v1/indicators` | Indicadores (`selic`, `ipca`, `usd_brl`) com o valor mais recente |
 | `GET /v1/indicators/{id}/values?from=AAAA-MM-DD&to=AAAA-MM-DD` | Série histórica; `from` e `to` são opcionais |
+| `GET /v1/fuels` | Combustíveis (`gasolina`, `etanol`, `diesel_s10`...) com a média nacional da última semana |
+| `GET /v1/fuels/{id}/prices?scope=BR\|UF&from=&to=` | Média semanal no Brasil (padrão) ou numa UF |
+| `GET /v1/fuels/{id}/municipalities?month=AAAA-MM` | Preço em cada município pesquisado, com coordenadas (mapa); sem `month`, o mais recente |
 
 ```bash
 curl "http://localhost:8080/v1/indicators/usd_brl/values?from=2026-11-01"
+curl "http://localhost:8080/v1/fuels/gasolina/prices?scope=SP&from=2026-09-01"
 ```
 
 Erros seguem sempre o formato `{"error": {"code": "...", "message": "..."}}`.

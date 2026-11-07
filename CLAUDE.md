@@ -57,8 +57,12 @@ Qualidade e clareza importam mais que quantidade de features.
   `sqlc diff`. numeric → float64 na API; datas como `AAAA-MM-DD`.
 - API conecta com `default_transaction_read_only=on`: o Postgres recusa escrita.
 - Rotas: `/health`, `/v1/indicators`, `/v1/indicators/{id}/values?from&to`,
-  `/openapi.yaml` (spec embutida com go:embed). Erros sempre
-  `{"error":{"code","message"}}`; 500 nunca expõe o erro interno.
+  `/v1/fuels`, `/v1/fuels/{id}/prices?scope&from&to` (scope `BR` ou UF),
+  `/v1/fuels/{id}/municipalities?month=AAAA-MM` (padrão: mês mais recente;
+  traz `available_months`), `/openapi.yaml` (spec embutida com go:embed).
+  Erros sempre `{"error":{"code","message"}}`; 500 nunca expõe o erro interno.
+- `httpapi.Store` embute uma interface por recurso (`IndicatorStore`,
+  `FuelStore`); nos testes, `fakeStore` embute `fakeFuelStore`.
 - Cache Redis na API fica para a Fase 3.
 - Web: Next.js 16 com Cache Components (ler a doc em
   `web/node_modules/next/dist/docs/` antes de mexer: a API mudou). Dados
