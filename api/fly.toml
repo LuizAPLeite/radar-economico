@@ -1,0 +1,35 @@
+# Deploy da API no Fly.io (https://fly.io/docs/reference/configuration/).
+# Publicar a partir da raiz do repositório:
+#   fly deploy --config api/fly.toml api
+
+# Nome único em todo o Fly.io: vira https://<app>.fly.dev
+app = "radar-economico-api"
+# São Paulo: perto do banco no Neon (AWS sa-east-1) e da Vercel (gru1).
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Sem tráfego, a máquina desliga (paga-se só pelo tempo ligada) e volta
+  # sozinha na próxima requisição, em cerca de 1 segundo.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/health"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+
+# A menor máquina: o binário Go usa poucos MB de memória.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
