@@ -41,17 +41,22 @@ docker compose exec postgres psql -U radar -c '\dn'   # deve listar raw, staging
 
 Além de Postgres e Redis, o `docker compose up` sobe:
 
-1. **collector** (roda uma vez): busca as séries do Banco Central e grava as
-   respostas brutas em `raw.bcb_sgs_responses`;
+1. **collector** (roda uma vez): coleta em paralelo o Banco Central (Selic,
+   IPCA, dólar), o IBGE (municípios e coordenadas) e a ANP (preços de
+   combustíveis por posto, últimos 12 meses) e grava tudo, intacto, no schema
+   `raw`. A primeira coleta da ANP leva alguns minutos: o servidor é lento;
+   as seguintes só baixam o que mudou;
 2. **pipeline** (roda uma vez, depois do collector): lê a coleta mais recente,
    valida e grava `staging.bcb_sgs_observations` e `mart.indicator_values`;
 3. **api** (fica no ar): serve a mart em http://localhost:8080;
 4. **web** (fica no ar): o dashboard em **http://localhost:3000**.
 
-Para coletar de novo (o pipeline roda em seguida), ou só reprocessar o raw:
+Para coletar de novo (o pipeline roda em seguida), coletar só uma fonte, ou
+só reprocessar o raw:
 
 ```bash
 docker compose up collector pipeline
+docker compose run --rm --no-deps -e COLLECTOR_SOURCES=ibge collector
 docker compose run --rm --no-deps pipeline
 ```
 
