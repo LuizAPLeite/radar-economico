@@ -42,6 +42,16 @@ Qualidade e clareza importam mais que quantidade de features.
   demais. Imagem distroless.
 - Testes de integração Go usam `TEST_DATABASE_URL` e são pulados sem ela;
   no CI o job Go sobe um Postgres e aplica as migrations antes.
+- Pipeline BCB: staging e mart são reconstruídas a cada execução a partir da
+  coleta bem-sucedida mais recente (que traz o histórico completo), com
+  DELETE + COPY + ANALYZE numa transação. Cargas incrementais: Fase 3.
+- Validação pandera ANTES de gravar: contrato violado = job falha e a mart
+  fica intacta. Datas repetidas falham (não são deduplicadas em silêncio).
+- mart: `mart.indicators` (ids `selic`, `ipca`, `usd_brl`, com limites de
+  sanidade em `pipeline/.../bcb/indicators.py`) e `mart.indicator_values`
+  (numeric). Datas após o dia da coleta (horário de Brasília) não entram.
+- Testes de integração Python usam a mesma `TEST_DATABASE_URL` e rodam numa
+  transação com `force_rollback`: não deixam rastro no banco.
 
 ## Regra de arquitetura
 Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco

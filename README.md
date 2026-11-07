@@ -32,11 +32,24 @@ docker compose up -d          # Postgres, Redis e aplica as migrations
 docker compose exec postgres psql -U radar -c '\dn'   # deve listar raw, staging, mart
 ```
 
-O `docker compose up` também roda o **collector** uma vez, que grava as séries
-do Banco Central em `raw.bcb_sgs_responses`. Para coletar de novo:
+O `docker compose up` também roda, uma vez cada, em ordem:
+
+1. **collector**: busca as séries do Banco Central e grava as respostas brutas
+   em `raw.bcb_sgs_responses`;
+2. **pipeline**: lê a coleta mais recente, valida e grava
+   `staging.bcb_sgs_observations` e `mart.indicator_values`.
+
+Para coletar de novo (o pipeline roda em seguida), ou só reprocessar o raw:
 
 ```bash
-docker compose up collector
+docker compose up collector pipeline
+docker compose run --rm --no-deps pipeline
+```
+
+Para ver os dados prontos:
+
+```bash
+docker compose exec postgres psql -U radar -c "SELECT * FROM mart.indicators"
 ```
 
 Cada componente:
@@ -46,7 +59,7 @@ go test ./collector/... ./api/...      # Go (a partir da raiz, via go.work)
 # com testes de integração (precisa do Postgres do compose rodando):
 TEST_DATABASE_URL=postgres://radar:radar@localhost:5432/radar?sslmode=disable go test ./collector/...
 go run ./api                            # API em http://localhost:8080/health
-cd pipeline && uv run pytest            # pipeline
+cd pipeline && uv run pytest            # pipeline (integração: mesma TEST_DATABASE_URL)
 cd web && npm install && npm run dev    # front em http://localhost:3000
 ```
 
