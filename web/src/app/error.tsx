@@ -4,6 +4,7 @@ import { useEffect } from "react";
 
 /**
  * Mostrada quando algo falha ao montar a página, por exemplo a API fora do ar.
+ * Fica dentro do layout, então a navegação entre as páginas continua na tela.
  * retry() busca os dados de novo e, se der certo, a página volta ao normal.
  */
 export default function ErrorPage({ error, retry }: { error: unknown; retry: () => void }) {
@@ -17,12 +18,11 @@ export default function ErrorPage({ error, retry }: { error: unknown; retry: () 
     typeof error === "object" && error !== null && "digest" in error ? String(error.digest) : null;
 
   return (
-    <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:py-14">
-      <h1 className="text-3xl font-semibold tracking-tight text-ink">Radar Econômico</h1>
-      <div role="alert" className="mt-8 rounded-xl border border-hairline bg-surface p-6">
-        <h2 className="text-lg font-semibold text-ink">Não foi possível carregar os dados</h2>
+    <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:py-12">
+      <div role="alert" className="rounded-xl border border-hairline bg-surface p-6">
+        <h1 className="text-lg font-semibold text-ink">Não foi possível carregar os dados</h1>
         <p className="mt-2 text-ink-2">
-          A API de indicadores não respondeu. Costuma ser passageiro; tente de novo em instantes.
+          A API do Radar Econômico não respondeu. Costuma ser passageiro; tente de novo em instantes.
         </p>
         <button
           type="button"

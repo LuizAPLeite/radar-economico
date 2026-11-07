@@ -10,12 +10,12 @@ import { Dashboard, DashboardSkeleton } from "@/components/Dashboard";
  */
 export default function Home() {
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-10 sm:py-14">
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-10 sm:py-12">
       <header className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-ink">Radar Econômico</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-ink">Selic, inflação e dólar</h1>
         <p className="mt-2 max-w-2xl text-ink-2">
-          Selic, inflação e dólar, direto do Banco Central: coletados, validados e servidos por um
-          pipeline de dados próprio.
+          Os indicadores direto do Banco Central: coletados, validados e servidos por um pipeline de
+          dados próprio.
         </p>
       </header>
 
