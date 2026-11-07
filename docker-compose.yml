@@ -66,5 +66,19 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-radar}:${POSTGRES_PASSWORD:-radar}@postgres:5432/${POSTGRES_DB:-radar}?sslmode=disable
     restart: "no"
 
+  # API REST somente leitura sobre a mart. Só precisa das tabelas existirem:
+  # sobe mesmo antes do pipeline e passa a servir os dados quando eles chegam.
+  api:
+    build: ./api
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-radar}:${POSTGRES_PASSWORD:-radar}@postgres:5432/${POSTGRES_DB:-radar}?sslmode=disable
+      PORT: "8080"
+    ports:
+      - "${API_PORT:-8080}:8080"
+    restart: unless-stopped
+
 volumes:
   pgdata:
