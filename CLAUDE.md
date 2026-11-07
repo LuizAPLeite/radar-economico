@@ -34,6 +34,14 @@ Qualidade e clareza importam mais que quantidade de features.
 - Front gerado com create-next-app (App Router, `src/`); CI roda lint,
   typecheck e build.
 - Branch principal: `main`.
+- raw do BCB: `raw.collection_runs` (uma linha por execução) e
+  `raw.bcb_sgs_responses` (corpo JSON da API intacto, append-only).
+  Séries do MVP: 432 (meta Selic), 433 (IPCA), 1 (dólar venda).
+- Collector: séries diárias em janelas de até 10 anos desde `SGS_START_DATE`;
+  4 consultas simultâneas (`errgroup.SetLimit`); uma falha não interrompe as
+  demais. Imagem distroless.
+- Testes de integração Go usam `TEST_DATABASE_URL` e são pulados sem ela;
+  no CI o job Go sobe um Postgres e aplica as migrations antes.
 
 ## Regra de arquitetura
 Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
