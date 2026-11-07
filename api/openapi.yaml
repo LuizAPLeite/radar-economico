@@ -127,7 +127,150 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /v1/fuels:
+    get:
+      operationId: listFuels
+      summary: Lista os combustíveis, cada um com a média nacional mais recente
+      description: |
+        Preços de revenda pesquisados pela ANP nos postos (gasolina, etanol,
+        diesel e GNV). A média é simples, sobre todos os postos da semana.
+      responses:
+        "200":
+          description: Combustíveis disponíveis
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FuelWithLatest"
+              example:
+                data:
+                  - id: gasolina
+                    name: Gasolina comum
+                    unit: R$/l
+                    updated_at: "2026-11-07T19:00:00Z"
+                    latest:
+                      week_start: "2026-10-26"
+                      avg_price: 6.505
+                      n_stations: 4560
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/fuels/{id}/prices:
+    get:
+      operationId: listFuelPrices
+      summary: Preço médio semanal de um combustível, no Brasil ou numa UF
+      description: |
+        Uma média por semana (a semana começa na segunda-feira), em ordem
+        cronológica. A série pode ter buracos: semanas sem pesquisa ou com
+        menos da metade dos postos de costume (ex.: um mês que a ANP não
+        publicou) ficam de fora, em vez de virar um ponto pouco confiável.
+      parameters:
+        - $ref: "#/components/parameters/FuelID"
+        - name: scope
+          in: query
+          description: "`BR` (padrão) ou a sigla de uma UF; aceita minúsculas"
+          schema:
+            type: string
+            examples: [BR, SP]
+        - name: from
+          in: query
+          description: Primeira semana, inclusiva (AAAA-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          description: Última semana, inclusiva (AAAA-MM-DD)
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Série semanal (pode ser vazia)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [fuel, scope, data]
+                properties:
+                  fuel:
+                    $ref: "#/components/schemas/Fuel"
+                  scope:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/WeekPrice"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/fuels/{id}/municipalities:
+    get:
+      operationId: listFuelMunicipalities
+      summary: Preço de um combustível em cada município pesquisado, num mês
+      description: |
+        Dados para o mapa: média, mínimo e máximo do mês em cada município,
+        com as coordenadas do centroide (IBGE). A ANP pesquisa ~400 dos 5.570
+        municípios. Sem `month`, usa o mês mais recente; `available_months`
+        lista os meses com dados.
+      parameters:
+        - $ref: "#/components/parameters/FuelID"
+        - name: month
+          in: query
+          description: Mês (AAAA-MM). Padrão, o mais recente com dados.
+          schema:
+            type: string
+            pattern: "^\\d{4}-\\d{2}$"
+            examples: ["2026-10"]
+      responses:
+        "200":
+          description: Preços por município no mês
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [fuel, month, available_months, data]
+                properties:
+                  fuel:
+                    $ref: "#/components/schemas/Fuel"
+                  month:
+                    type: [string, "null"]
+                    description: Mês mostrado (null se o combustível não tem dados)
+                  available_months:
+                    type: array
+                    items:
+                      type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MunicipalPrice"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
 components:
+  parameters:
+    FuelID:
+      name: id
+      in: path
+      required: true
+      description: Identificador do combustível
+      schema:
+        type: string
+        enum: [gasolina, gasolina_aditivada, etanol, diesel, diesel_s10, gnv]
+
   schemas:
     Indicator:
       type: object
@@ -176,6 +319,76 @@ components:
           format: date
         value:
           type: number
+
+    Fuel:
+      type: object
+      required: [id, name, unit, updated_at]
+      properties:
+        id:
+          type: string
+          examples: [gasolina]
+        name:
+          type: string
+          examples: [Gasolina comum]
+        unit:
+          type: string
+          description: "R$/l, ou R$/m³ para o GNV"
+          examples: [R$/l]
+        updated_at:
+          type: string
+          format: date-time
+          description: Quando o pipeline atualizou os preços (UTC)
+
+    FuelWithLatest:
+      allOf:
+        - $ref: "#/components/schemas/Fuel"
+        - type: object
+          required: [latest]
+          properties:
+            latest:
+              $ref: "#/components/schemas/WeekPrice"
+
+    WeekPrice:
+      type: object
+      required: [week_start, avg_price, n_stations]
+      properties:
+        week_start:
+          type: string
+          format: date
+          description: Segunda-feira da semana
+        avg_price:
+          type: number
+        n_stations:
+          type: integer
+          description: Postos pesquisados na semana
+
+    MunicipalPrice:
+      type: object
+      required: [ibge_code, name, uf, latitude, longitude, avg_price, min_price, max_price, n_stations]
+      properties:
+        ibge_code:
+          type: integer
+          description: Código do município no IBGE (7 dígitos)
+          examples: [3550308]
+        name:
+          type: string
+          examples: [São Paulo]
+        uf:
+          type: string
+          examples: [SP]
+        latitude:
+          type: number
+        longitude:
+          type: number
+        avg_price:
+          type: number
+        min_price:
+          type: number
+        max_price:
+          type: number
+        n_stations:
+          type: integer
+          description: Postos pesquisados no mês
 
     Error:
       type: object
