@@ -1,5 +1,5 @@
-// Command collector coleta as fontes de dados (Banco Central, IBGE) e grava o
-// conteúdo bruto no schema raw. Roda uma vez e termina.
+// Command collector coleta as fontes de dados (Banco Central, IBGE, ANP) e
+// grava o conteúdo bruto no schema raw. Roda uma vez e termina.
 //
 // Variáveis de ambiente:
 //
@@ -7,6 +7,7 @@
 //	COLLECTOR_SOURCES      fontes a coletar, separadas por vírgula (padrão: todas)
 //	SGS_START_DATE         início das séries diárias do BCB (padrão 2000-01-01)
 //	COLLECTOR_CONCURRENCY  consultas simultâneas ao BCB (padrão 4)
+//	ANP_START_MONTH        primeiro mês da ANP, AAAA-MM (padrão: 12 meses atrás)
 package main
 
 import (
@@ -29,6 +30,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/LuizAPLeite/radar-economico/collector/internal/anp"
 	"github.com/LuizAPLeite/radar-economico/collector/internal/collect"
 	"github.com/LuizAPLeite/radar-economico/collector/internal/fetch"
 	"github.com/LuizAPLeite/radar-economico/collector/internal/sgs"
@@ -40,6 +42,7 @@ type config struct {
 	sources     []string // vazio = todas
 	startDate   time.Time
 	concurrency int
+	anpStart    time.Time // zero = padrão (ver defaultANPStart)
 }
 
 // source é uma fonte de dados: o nome (gravado em raw.collection_runs.source)
@@ -84,6 +87,9 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	if cfg.anpStart.IsZero() {
+		cfg.anpStart = defaultANPStart(today)
+	}
 
 	db := store.New(pool)
 	sources, err := selectSources(buildSources(cfg, logger, db, today), cfg.sources)
@@ -106,7 +112,29 @@ func buildSources(cfg config, logger *slog.Logger, db *store.Store, today time.T
 		{"ibge", func(ctx context.Context, runID int64) error {
 			return collect.IBGE(ctx, logger, fetch.NewClient(logger, time.Minute), db, runID, collect.IBGEDatasets)
 		}},
+		{"anp", func(ctx context.Context, runID int64) error {
+			// O servidor da ANP é lento (~200 KB/s): até 5 min por arquivo e
+			// só 2 downloads por vez, para não sobrecarregá-lo.
+			stats, err := collect.ANP(ctx, logger, fetch.NewClient(logger, 5*time.Minute), db, runID, collect.ANPConfig{
+				PageURL:     anp.DatasetPageURL,
+				StartMonth:  cfg.anpStart,
+				Recheck:     2,
+				Concurrency: 2,
+				Discover:    anp.Discover,
+			})
+			logger.Info("resumo da anp", "from", cfg.anpStart.Format("2006-01"),
+				"found", stats.Found, "downloaded", stats.Downloaded, "saved", stats.Saved,
+				"unchanged", stats.Unchanged, "failed", stats.Failed, "missing", stats.Missing)
+			return err
+		}},
 	}
+}
+
+// defaultANPStart devolve o 1º dia do mês 12 meses antes do mês de hoje: a
+// janela padrão cobre um ano de preços. (O Go normaliza meses fora de 1..12:
+// janeiro - 12 vira janeiro do ano anterior.)
+func defaultANPStart(today time.Time) time.Time {
+	return time.Date(today.Year(), today.Month()-12, 1, 0, 0, 0, 0, time.UTC)
 }
 
 // selectSources filtra as fontes pelos nomes pedidos (vazio = todas).
@@ -193,6 +221,13 @@ func loadConfig() (config, error) {
 			return cfg, fmt.Errorf("SGS_START_DATE inválida (use AAAA-MM-DD): %w", err)
 		}
 		cfg.startDate = t
+	}
+	if v := os.Getenv("ANP_START_MONTH"); v != "" {
+		t, err := time.Parse("2006-01", v)
+		if err != nil {
+			return cfg, fmt.Errorf("ANP_START_MONTH inválida (use AAAA-MM): %w", err)
+		}
+		cfg.anpStart = t
 	}
 	if v := os.Getenv("COLLECTOR_CONCURRENCY"); v != "" {
 		n, err := strconv.Atoi(v)

@@ -52,6 +52,8 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-radar}:${POSTGRES_PASSWORD:-radar}@postgres:5432/${POSTGRES_DB:-radar}?sslmode=disable
       SGS_START_DATE: ${SGS_START_DATE:-2000-01-01}
       COLLECTOR_CONCURRENCY: ${COLLECTOR_CONCURRENCY:-4}
+      COLLECTOR_SOURCES: ${COLLECTOR_SOURCES:-}
+      ANP_START_MONTH: ${ANP_START_MONTH:-}
     restart: "no"
 
   # Lê a coleta mais recente do raw e grava staging e mart. Roda depois do
