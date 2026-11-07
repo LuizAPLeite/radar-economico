@@ -1,0 +1,4 @@
+# Normaliza finais de linha (o repositório é desenvolvido no Windows e roda em Linux)
+* text=auto eol=lf
+*.png binary
+*.ico binary
