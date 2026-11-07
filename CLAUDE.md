@@ -60,6 +60,17 @@ Qualidade e clareza importam mais que quantidade de features.
   `/openapi.yaml` (spec embutida com go:embed). Erros sempre
   `{"error":{"code","message"}}`; 500 nunca expõe o erro interno.
 - Cache Redis na API fica para a Fase 3.
+- Web: Next.js 16 com Cache Components (ler a doc em
+  `web/node_modules/next/dist/docs/` antes de mexer: a API mudou). Dados
+  buscados no servidor (Server Component dentro de `<Suspense>`), sem cache
+  no Next por enquanto; `next build` não chama a API. URL em `API_URL`
+  (runtime; no Compose `http://api:8080`). Navegador nunca fala com a API.
+- Web: gráficos com echarts + echarts-for-react (import modular); cores como
+  variáveis CSS em `globals.css`, da paleta do guia de dataviz, validadas com
+  o script dele nos dois modos. Um seletor de período único para todos os
+  gráficos (sem zoom por gráfico); tabela acessível ao lado de cada gráfico.
+- Web: testes de funções puras com `node --test` (Node 26 roda TS direto,
+  imports com extensão `.ts`); imagem Docker com `output: "standalone"`.
 
 ## Regra de arquitetura
 Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco

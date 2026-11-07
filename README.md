@@ -28,7 +28,7 @@ Pré-requisitos: Docker, Go, Python 3.13 + [uv](https://docs.astral.sh/uv/), Nod
 
 ```bash
 cp .env.example .env
-docker compose up -d          # banco, migrations, coleta, pipeline e API
+docker compose up -d          # banco, migrations, coleta, pipeline, API e dashboard
 docker compose exec postgres psql -U radar -c '\dn'   # deve listar raw, staging, mart
 ```
 
@@ -38,7 +38,8 @@ Além de Postgres e Redis, o `docker compose up` sobe:
    respostas brutas em `raw.bcb_sgs_responses`;
 2. **pipeline** (roda uma vez, depois do collector): lê a coleta mais recente,
    valida e grava `staging.bcb_sgs_observations` e `mart.indicator_values`;
-3. **api** (fica no ar): serve a mart em http://localhost:8080.
+3. **api** (fica no ar): serve a mart em http://localhost:8080;
+4. **web** (fica no ar): o dashboard em **http://localhost:3000**.
 
 Para coletar de novo (o pipeline roda em seguida), ou só reprocessar o raw:
 
@@ -61,12 +62,31 @@ go test ./collector/... ./api/...      # Go (a partir da raiz, via go.work)
 TEST_DATABASE_URL=postgres://radar:radar@localhost:5432/radar?sslmode=disable go test ./collector/... ./api/...
 DATABASE_URL=postgres://radar:radar@localhost:5432/radar?sslmode=disable go run ./api   # API fora do Docker
 uv run --directory pipeline pytest      # pipeline (integração: mesma TEST_DATABASE_URL)
-cd web && npm install && npm run dev    # front em http://localhost:3000
+npm --prefix web install                # web: dependências
+npm --prefix web test                   # web: testes (node --test, sem bibliotecas extras)
+npm --prefix web run dev                # web fora do Docker, em http://localhost:3000 (usa a API em :8080)
 ```
 
 > **No PowerShell**, a sintaxe `VAR=valor comando` não existe. Defina a variável
 > antes, e ela vale para os próximos comandos no mesmo terminal:
 > `$env:TEST_DATABASE_URL="postgres://radar:radar@localhost:5432/radar?sslmode=disable"`
+
+## Dashboard
+
+Next.js 16 (App Router, Cache Components) em http://localhost:3000:
+
+- **Cards** com o último valor de cada indicador: a última decisão do Copom
+  sobre a Selic, o IPCA acumulado em 12 meses e a variação diária do dólar;
+- **Gráficos** (ECharts): Selic em degraus (só muda nas reuniões do Copom),
+  IPCA em barras (cada mês é uma variação, acima ou abaixo de zero) e dólar
+  em linha, com um seletor de período único para os três;
+- **Tabela** com os valores mais recentes ao lado de cada gráfico, como
+  alternativa acessível; tema claro e escuro; funciona no celular.
+
+Os dados são buscados no **servidor** do Next: o navegador nunca chama a API
+(sem CORS, URL da API em `API_URL`, lida em tempo de execução). A parte que
+depende da API fica dentro de um `<Suspense>`, então o `next build` gera o
+restante da página como HTML estático e **não precisa da API no ar**.
 
 ## API
 
