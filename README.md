@@ -3,13 +3,14 @@
 Coleta dados públicos brasileiros (Banco Central, IBGE e ANP), processa em
 camadas e exibe num dashboard web com gráficos e mapa.
 
-> **Fase 1 concluída:** Selic, IPCA e dólar do Banco Central de ponta a ponta,
+> **Fases 1 e 2 concluídas:** Selic, IPCA e dólar do Banco Central, e os
+> preços de combustíveis da ANP com mapa por município, de ponta a ponta,
 > rodando localmente com `docker compose up` (o deploy está configurado, mas
-> ainda não publicado). **Em andamento:** Fase 2, preços de combustíveis da ANP.
+> ainda não publicado).
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/img/dashboard-escuro.png">
-  <img alt="Dashboard do Radar Econômico: cards com a meta Selic (13,75% ao ano), o IPCA (0,82% em setembro, 4,58% em 12 meses) e o dólar (R$ 5,5013), seguidos de um gráfico de cada indicador nos últimos 5 anos" src="docs/img/dashboard.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/combustiveis-escuro.png">
+  <img alt="Página de combustíveis do Radar Econômico: filtros de combustível e estado, cards com a gasolina a R$ 6,51 no Brasil, o município mais barato (Goiatuba, R$ 5,74) e o mais caro (Parintins, R$ 8,99) em outubro de 2026, o gráfico do preço médio semanal e o mapa do Brasil com um ponto colorido por município pesquisado, ao lado dos rankings" src="docs/img/combustiveis.png">
 </picture>
 
 ## Arquitetura
@@ -26,7 +27,7 @@ A API só lê o schema `mart`.
 | `collector/` | Go | Coleta concorrente das fontes, grava em `raw` |
 | `pipeline/` | Python, polars, pandera | Limpa e valida `raw` → `staging` → `mart` |
 | `api/` | Go | API REST somente leitura sobre `mart` |
-| `web/` | Next.js, TypeScript, Tailwind | Dashboard |
+| `web/` | Next.js, TypeScript, Tailwind, ECharts, MapLibre | Dashboard com gráficos e mapa |
 | `db/migrations/` | SQL (golang-migrate) | Schemas e tabelas |
 
 ## Rodando localmente
@@ -93,7 +94,10 @@ npm --prefix web run dev                # web fora do Docker, em http://localhos
 
 ## Dashboard
 
-Next.js 16 (App Router, Cache Components) em http://localhost:3000:
+Next.js 16 (App Router, Cache Components) em http://localhost:3000, com duas
+páginas, tema claro e escuro, e funcionando no celular.
+
+**Indicadores** (`/`):
 
 - **Cards** com o último valor de cada indicador: a última decisão do Copom
   sobre a Selic, o IPCA acumulado em 12 meses e a variação diária do dólar;
@@ -101,12 +105,40 @@ Next.js 16 (App Router, Cache Components) em http://localhost:3000:
   IPCA em barras (cada mês é uma variação, acima ou abaixo de zero) e dólar
   em linha, com um seletor de período único para os três;
 - **Tabela** com os valores mais recentes ao lado de cada gráfico, como
-  alternativa acessível; tema claro e escuro; funciona no celular.
+  alternativa acessível.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/dashboard-escuro.png">
+  <img alt="Página de indicadores: cards com a meta Selic (13,75% ao ano), o IPCA (0,82% em setembro, 4,58% em 12 meses) e o dólar (R$ 5,5013), seguidos de um gráfico de cada indicador nos últimos 5 anos" src="docs/img/dashboard.png">
+</picture>
+
+**Combustíveis** (`/combustiveis`):
+
+- **Filtros** de combustível, estado e mês, guardados na URL
+  (`/combustiveis?combustivel=etanol&uf=SP&mes=2026-10`): a página filtrada
+  pode ser compartilhada, e o botão Voltar desfaz a última troca;
+- **Cards** com o preço médio da última semana (e a variação em 4 semanas) e
+  os municípios mais barato e mais caro do mês;
+- **Gráfico semanal**: com um estado escolhido, a linha dele em destaque e a
+  do Brasil em cinza, como referência. A linha é interrompida nas semanas sem
+  pesquisa completa, em vez de ligar os pontos por cima do buraco;
+- **Mapa** ([MapLibre](https://maplibre.org)) com um ponto por município
+  pesquisado, colorido em cinco faixas de preço (quintis, com a mesma escala
+  para o país inteiro); o estado escolhido fica em destaque e enquadrado;
+- **Rankings** dos mais baratos e mais caros (só municípios com 3 ou mais
+  postos) e a **tabela** de todos os municípios do mês.
+
+O mapa não depende de nenhum serviço de mapas: o fundo é o contorno dos
+estados, gerado a partir da malha do IBGE por `web/scripts/build-ufs-geojson.mjs`
+e guardado em `web/public/geo/ufs.json`. O worker do MapLibre é copiado de
+`node_modules` para `web/public/vendor/` antes do `dev` e do `build`.
 
 Os dados são buscados no **servidor** do Next: o navegador nunca chama a API
-(sem CORS, URL da API em `API_URL`, lida em tempo de execução). A parte que
-depende da API fica dentro de um `<Suspense>`, então o `next build` gera o
-restante da página como HTML estático e **não precisa da API no ar**.
+(sem CORS, URL da API em `API_URL`, lida em tempo de execução). Trocar um
+filtro é uma navegação: o servidor busca os dados novos, e enquanto isso a
+página mostra a escolha nova e esmaece o conteúdo antigo. A parte que depende
+da API fica dentro de um `<Suspense>`, então o `next build` gera o restante da
+página como HTML estático e **não precisa da API no ar**.
 
 ## API
 

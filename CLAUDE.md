@@ -75,6 +75,20 @@ Qualidade e clareza importam mais que quantidade de features.
   gráficos (sem zoom por gráfico); tabela acessível ao lado de cada gráfico.
 - Web: testes de funções puras com `node --test` (Node 26 roda TS direto,
   imports com extensão `.ts`); imagem Docker com `output: "standalone"`.
+- Web, combustíveis (`/combustiveis`): filtros na URL (`combustivel`, `uf`,
+  `mes`; valor inválido vira o padrão), trocados com `router.push` numa
+  transição + `useOptimistic` (padrão da doc do Next 16): o conteúdo antigo
+  esmaece, sem voltar ao esqueleto. Navegação entre páginas no layout
+  (`SiteNav`); títulos com o template "%s · Radar Econômico".
+- Mapa: MapLibre GL 6, só no cliente (`next/dynamic` com `ssr: false`), sem
+  serviço de mapas: o fundo é o contorno das UFs do IBGE
+  (`web/public/geo/ufs.json`, com `bbox` por UF, gerado por
+  `web/scripts/build-ufs-geojson.mjs`). O worker do MapLibre 6 precisa ser
+  servido: `predev`/`prebuild` copiam para `web/public/vendor/` (fora do git)
+  e o mapa chama `setWorkerUrl`. Cores em 5 faixas por quintis (comparando em
+  centavos, arredondados como na tela), uma escala só para o país; no escuro
+  a escala inverte. A tabela com todos os municípios só é montada quando
+  aberta (os dados já vêm para o mapa).
 - Deploy ADIADO por decisão de custo (nov/2026): a configuração está pronta,
   mas nada foi publicado. Publicar quando o usuário decidir; Neon e Vercel são
   grátis, só a API no Fly.io custa (~US$ 2/mês, exige cartão). Revisar os
@@ -124,7 +138,8 @@ Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
 - Fase 0: monorepo, Docker Compose (Postgres + Redis), migrations, CI básico.
 - Fase 1: Banco Central (Selic, IPCA, dólar) de ponta a ponta, com deploy. ← MVP
   Concluída localmente; o deploy ficou para depois (ver "Decisões tomadas").
-- Fase 2: ANP (combustíveis) + filtros + mapa por município. ← atual
+- Fase 2: ANP (combustíveis) + filtros + mapa por município.
+  Concluída localmente.
 - Fase 3: cargas incrementais, testes, validação de dados, cache, coleta agendada,
   endpoint de saúde dos dados.
 - Fase 4: análises (previsão de preços, correlação dólar × gasolina).
