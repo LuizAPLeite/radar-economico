@@ -3,7 +3,14 @@
 Coleta dados públicos brasileiros (Banco Central, IBGE e ANP), processa em
 camadas e exibe num dashboard web com gráficos e mapa.
 
-> Em construção — Fase 1 (indicadores do Banco Central de ponta a ponta).
+> **Fase 1 concluída:** Selic, IPCA e dólar do Banco Central de ponta a ponta,
+> rodando localmente com `docker compose up` (o deploy está configurado, mas
+> ainda não publicado). **Em andamento:** Fase 2, preços de combustíveis da ANP.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/dashboard-escuro.png">
+  <img alt="Dashboard do Radar Econômico: cards com a meta Selic (13,75% ao ano), o IPCA (0,82% em setembro, 4,58% em 12 meses) e o dólar (R$ 5,5013), seguidos de um gráfico de cada indicador nos últimos 5 anos" src="docs/img/dashboard.png">
+</picture>
 
 ## Arquitetura
 
