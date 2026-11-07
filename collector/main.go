@@ -1,11 +1,12 @@
-// Command collector coleta as séries do Banco Central (API SGS) e grava as
-// respostas brutas no schema raw. Roda uma vez e termina.
+// Command collector coleta as fontes de dados (Banco Central, IBGE) e grava o
+// conteúdo bruto no schema raw. Roda uma vez e termina.
 //
 // Variáveis de ambiente:
 //
 //	DATABASE_URL           obrigatória
-//	SGS_START_DATE         início das séries diárias (padrão 2000-01-01)
-//	COLLECTOR_CONCURRENCY  consultas simultâneas (padrão 4)
+//	COLLECTOR_SOURCES      fontes a coletar, separadas por vírgula (padrão: todas)
+//	SGS_START_DATE         início das séries diárias do BCB (padrão 2000-01-01)
+//	COLLECTOR_CONCURRENCY  consultas simultâneas ao BCB (padrão 4)
 package main
 
 import (
@@ -15,7 +16,10 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
+	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -26,14 +30,23 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/LuizAPLeite/radar-economico/collector/internal/collect"
+	"github.com/LuizAPLeite/radar-economico/collector/internal/fetch"
 	"github.com/LuizAPLeite/radar-economico/collector/internal/sgs"
 	"github.com/LuizAPLeite/radar-economico/collector/internal/store"
 )
 
 type config struct {
 	databaseURL string
+	sources     []string // vazio = todas
 	startDate   time.Time
 	concurrency int
+}
+
+// source é uma fonte de dados: o nome (gravado em raw.collection_runs.source)
+// e a função que faz a coleta.
+type source struct {
+	name    string
+	collect func(ctx context.Context, runID int64) error
 }
 
 func main() {
@@ -54,7 +67,7 @@ func run(logger *slog.Logger) error {
 	}
 
 	// Ctrl+C (SIGINT) ou `docker stop` (SIGTERM) cancelam o contexto,
-	// e as consultas em andamento param de forma limpa.
+	// e as coletas em andamento param de forma limpa.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -67,35 +80,95 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("conectando ao banco: %w", err)
 	}
 
-	db := store.New(pool)
-	runID, err := db.StartRun(ctx, "bcb_sgs")
-	if err != nil {
-		return err
-	}
-
 	today, err := todayInBrazil()
 	if err != nil {
 		return err
 	}
-	reqs := collect.BuildRequests(collect.BCBSeries, cfg.startDate, today)
-	logger.Info("coleta iniciada", "run_id", runID, "requests", len(reqs),
-		"concurrency", cfg.concurrency, "from", cfg.startDate.Format(time.DateOnly), "to", today.Format(time.DateOnly))
+
+	db := store.New(pool)
+	sources, err := selectSources(buildSources(cfg, logger, db, today), cfg.sources)
+	if err != nil {
+		return err
+	}
+	return runSources(ctx, logger, db, sources)
+}
+
+// buildSources lista as fontes que o collector sabe coletar.
+func buildSources(cfg config, logger *slog.Logger, db *store.Store, today time.Time) []source {
+	return []source{
+		{"bcb_sgs", func(ctx context.Context, runID int64) error {
+			reqs := collect.BuildRequests(collect.BCBSeries, cfg.startDate, today)
+			stats, err := collect.BCB(ctx, logger, sgs.NewClient(logger), db, runID, reqs, cfg.concurrency)
+			logger.Info("resumo do bcb_sgs", "requests", len(reqs),
+				"saved", stats.Saved, "empty", stats.Empty, "failed", stats.Failed)
+			return err
+		}},
+		{"ibge", func(ctx context.Context, runID int64) error {
+			return collect.IBGE(ctx, logger, fetch.NewClient(logger, time.Minute), db, runID, collect.IBGEDatasets)
+		}},
+	}
+}
+
+// selectSources filtra as fontes pelos nomes pedidos (vazio = todas).
+func selectSources(all []source, names []string) ([]source, error) {
+	if len(names) == 0 {
+		return all, nil
+	}
+	var selected []source
+	for _, name := range names {
+		i := slices.IndexFunc(all, func(s source) bool { return s.name == name })
+		if i == -1 {
+			valid := make([]string, len(all))
+			for k, s := range all {
+				valid[k] = s.name
+			}
+			return nil, fmt.Errorf("COLLECTOR_SOURCES: fonte %q desconhecida (válidas: %s)", name, strings.Join(valid, ", "))
+		}
+		selected = append(selected, all[i])
+	}
+	return selected, nil
+}
+
+// runSources coleta as fontes ao mesmo tempo, cada uma numa goroutine. Uma
+// falha não interrompe as outras; os erros voltam juntos no final.
+func runSources(ctx context.Context, logger *slog.Logger, db *store.Store, sources []source) error {
+	// errs[i] só é escrito pela goroutine i: posições diferentes do slice,
+	// então não há disputa e não precisa de mutex.
+	errs := make([]error, len(sources))
+	var wg sync.WaitGroup
+	for i, src := range sources {
+		wg.Go(func() { errs[i] = runSource(ctx, logger, db, src) })
+	}
+	wg.Wait()
+	return errors.Join(errs...)
+}
+
+// runSource registra a coleta de uma fonte em raw.collection_runs (início,
+// fim e status) e executa a coleta.
+func runSource(ctx context.Context, logger *slog.Logger, db *store.Store, src source) error {
+	runID, err := db.StartRun(ctx, src.name)
+	if err != nil {
+		return fmt.Errorf("%s: %w", src.name, err)
+	}
+	logger.Info("coleta iniciada", "source", src.name, "run_id", runID)
 
 	began := time.Now()
-	stats, runErr := collect.Run(ctx, logger, sgs.NewClient(logger), db, runID, reqs, cfg.concurrency)
+	runErr := src.collect(ctx, runID)
 
 	// Usa um contexto novo: se o anterior foi cancelado por Ctrl+C,
 	// ainda queremos registrar que a coleta falhou.
 	finishCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := db.FinishRun(finishCtx, runID, runErr); err != nil {
-		return errors.Join(runErr, err)
+		return fmt.Errorf("%s: %w", src.name, errors.Join(runErr, err))
 	}
 
-	logger.Info("coleta finalizada", "run_id", runID,
-		"saved", stats.Saved, "empty", stats.Empty, "failed", stats.Failed,
-		"took_ms", time.Since(began).Milliseconds())
-	return runErr
+	logger.Info("coleta finalizada", "source", src.name, "run_id", runID,
+		"ok", runErr == nil, "took_ms", time.Since(began).Milliseconds())
+	if runErr != nil {
+		return fmt.Errorf("%s: %w", src.name, runErr)
+	}
+	return nil
 }
 
 func loadConfig() (config, error) {
@@ -106,6 +179,13 @@ func loadConfig() (config, error) {
 	}
 	if cfg.databaseURL == "" {
 		return cfg, errors.New("DATABASE_URL não definida")
+	}
+	if v := os.Getenv("COLLECTOR_SOURCES"); v != "" {
+		for name := range strings.SplitSeq(v, ",") {
+			if name = strings.TrimSpace(name); name != "" && !slices.Contains(cfg.sources, name) {
+				cfg.sources = append(cfg.sources, name)
+			}
+		}
 	}
 	if v := os.Getenv("SGS_START_DATE"); v != "" {
 		t, err := time.Parse(time.DateOnly, v)

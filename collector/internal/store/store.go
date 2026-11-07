@@ -70,6 +70,28 @@ func (s *Store) SaveResponse(ctx context.Context, runID int64, r sgs.Response) e
 	return nil
 }
 
+// SaveIBGE grava uma resposta do IBGE, mas só se ela mudou desde a última
+// gravação do mesmo conjunto (compara o SHA-256). Devolve se gravou.
+//
+// A comparação e a gravação estão no MESMO comando SQL: não há janela entre
+// "ler o último hash" e "inserir" em que outra coleta pudesse se intrometer.
+func (s *Store) SaveIBGE(ctx context.Context, runID int64, dataset, url, sha256 string, payload []byte) (bool, error) {
+	tag, err := s.pool.Exec(ctx,
+		`INSERT INTO raw.ibge_responses (run_id, dataset, request_url, sha256, payload)
+		 SELECT $1, $2, $3, $4, $5::jsonb
+		  WHERE $4 IS DISTINCT FROM (
+		        SELECT sha256 FROM raw.ibge_responses
+		         WHERE dataset = $2
+		         ORDER BY fetched_at DESC, id DESC
+		         LIMIT 1)`,
+		runID, dataset, url, sha256, string(payload),
+	)
+	if err != nil {
+		return false, fmt.Errorf("store: gravando ibge %s: %w", dataset, err)
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
 // dateOrNil converte a data zero (consulta sem filtro) em NULL.
 func dateOrNil(t time.Time) any {
 	if t.IsZero() {

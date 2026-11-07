@@ -30,6 +30,46 @@ func newTestStore(t *testing.T) (*Store, *pgxpool.Pool) {
 	return New(pool), pool
 }
 
+func TestStore_SaveIBGESkipsUnchangedContent(t *testing.T) {
+	s, pool := newTestStore(t)
+	ctx := context.Background()
+
+	runID, err := s.StartRun(ctx, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM raw.ibge_responses WHERE run_id = $1`, runID)
+		_, _ = pool.Exec(ctx, `DELETE FROM raw.collection_runs WHERE id = $1`, runID)
+	})
+
+	steps := []struct {
+		name, sha string
+		wantSaved bool
+	}{
+		{"conteúdo novo é gravado", "teste-hash-a", true},
+		{"o mesmo conteúdo de novo é ignorado", "teste-hash-a", false},
+		{"conteúdo diferente é gravado", "teste-hash-b", true},
+	}
+	for _, st := range steps {
+		saved, err := s.SaveIBGE(ctx, runID, "municipios", "http://ibge/m", st.sha, []byte(`[{"id": 1}]`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if saved != st.wantSaved {
+			t.Errorf("%s: saved = %v, quer %v", st.name, saved, st.wantSaved)
+		}
+	}
+
+	var n int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM raw.ibge_responses WHERE run_id = $1`, runID).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Errorf("linhas gravadas = %d, quer 2", n)
+	}
+}
+
 func TestStore_RunLifecycle(t *testing.T) {
 	s, pool := newTestStore(t)
 	ctx := context.Background()

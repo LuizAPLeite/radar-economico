@@ -88,7 +88,7 @@ func TestRun_SavesAllAndRespectsConcurrency(t *testing.T) {
 	f := &fakeFetcher{}
 	s := &fakeSaver{}
 
-	stats, err := Run(context.Background(), discard, f, s, 1, reqs, 4)
+	stats, err := BCB(context.Background(), discard, f, s, 1, reqs, 4)
 	if err != nil {
 		t.Fatalf("erro inesperado: %v", err)
 	}
@@ -108,12 +108,12 @@ func TestRun_FailureDoesNotStopOthers(t *testing.T) {
 	f := &fakeFetcher{failCodes: map[int]bool{2: true}}
 	s := &fakeSaver{}
 
-	stats, err := Run(context.Background(), discard, f, s, 1, reqs, 2)
+	stats, err := BCB(context.Background(), discard, f, s, 1, reqs, 2)
 
 	if err == nil {
 		t.Fatal("esperava erro da série 2")
 	}
-	want := Stats{Saved: 3, Empty: 1, Failed: 1}
+	want := BCBStats{Saved: 3, Empty: 1, Failed: 1}
 	if stats != want {
 		t.Errorf("stats = %+v, quer %+v", stats, want)
 	}

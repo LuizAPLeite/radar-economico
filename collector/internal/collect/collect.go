@@ -1,126 +1,26 @@
-// Package collect orquestra a coleta: monta as consultas, executa em
-// paralelo com limite de concorrência e entrega cada resposta para gravação.
+// Package collect orquestra a coleta de cada fonte (Banco Central, IBGE,
+// ANP): decide o que buscar, busca e entrega o conteúdo bruto para gravação.
+//
+// As dependências de rede e de banco entram por interfaces pequenas,
+// definidas por quem USA (este pacote), e não por quem implementa: é o padrão
+// em Go. Assim os testes trocam a internet e o Postgres por versões falsas,
+// sem nenhuma biblioteca de mock.
 package collect
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"log/slog"
-	"sync"
-	"time"
-
-	"golang.org/x/sync/errgroup"
-
-	"github.com/LuizAPLeite/radar-economico/collector/internal/sgs"
+	"crypto/sha256"
+	"encoding/hex"
 )
 
-// Series descreve uma série do SGS que queremos coletar.
-type Series struct {
-	Code  int
-	Name  string
-	Daily bool // séries diárias exigem datas e janelas de até 10 anos
+// Getter baixa uma URL e devolve o corpo (implementado por fetch.Client).
+type Getter interface {
+	Get(ctx context.Context, url string) ([]byte, error)
 }
 
-// BCBSeries são as séries do MVP (Fase 1).
-var BCBSeries = []Series{
-	{Code: 432, Name: "Meta Selic", Daily: true},
-	{Code: 433, Name: "IPCA (variação mensal)", Daily: false},
-	{Code: 1, Name: "Dólar comercial (venda)", Daily: true},
-}
-
-// Interfaces pequenas, definidas por quem USA (este pacote), e não por quem
-// implementa: é o padrão em Go. Assim os testes trocam a API e o banco por
-// versões falsas sem nenhuma biblioteca de mock.
-
-// Fetcher busca uma consulta na API.
-type Fetcher interface {
-	Fetch(ctx context.Context, req sgs.Request) (sgs.Response, error)
-}
-
-// Saver grava uma resposta bruta.
-type Saver interface {
-	SaveResponse(ctx context.Context, runID int64, resp sgs.Response) error
-}
-
-// BuildRequests transforma a lista de séries em consultas: séries diárias
-// viram uma consulta por janela de até 10 anos entre start e end; as demais
-// viram uma única consulta sem datas (a API devolve o histórico inteiro).
-func BuildRequests(series []Series, start, end time.Time) []sgs.Request {
-	var reqs []sgs.Request
-	for _, s := range series {
-		if !s.Daily {
-			reqs = append(reqs, sgs.Request{SeriesCode: s.Code})
-			continue
-		}
-		for _, w := range sgs.SplitWindows(start, end, sgs.MaxDailyWindowYears) {
-			reqs = append(reqs, sgs.Request{SeriesCode: s.Code, Start: w.Start, End: w.End})
-		}
-	}
-	return reqs
-}
-
-// Stats resume uma execução.
-type Stats struct {
-	Saved  int // respostas gravadas (inclui as vazias)
-	Empty  int // períodos sem dados
-	Failed int // consultas que falharam
-}
-
-// Run executa as consultas com no máximo `concurrency` ao mesmo tempo.
-// Uma consulta que falha não interrompe as outras: o objetivo é gravar o
-// máximo possível. Todos os erros voltam juntos no final.
-func Run(ctx context.Context, logger *slog.Logger, f Fetcher, s Saver,
-	runID int64, reqs []sgs.Request, concurrency int,
-) (Stats, error) {
-	// errgroup.Group é um WaitGroup com extras. SetLimit faz g.Go bloquear
-	// quando já há `concurrency` goroutines rodando, o que funciona como um
-	// semáforo e evita disparar dezenas de requisições de uma vez no BCB.
-	var g errgroup.Group
-	g.SetLimit(concurrency)
-
-	var (
-		mu    sync.Mutex // protege stats e errs, escritos por várias goroutines
-		stats Stats
-		errs  []error
-	)
-
-	for _, req := range reqs {
-		// Desde o Go 1.22, cada iteração tem sua própria variável `req`,
-		// então é seguro usá-la dentro da goroutine.
-		g.Go(func() error {
-			start := time.Now()
-			resp, err := f.Fetch(ctx, req)
-			if err == nil {
-				err = s.SaveResponse(ctx, runID, resp)
-			}
-
-			mu.Lock()
-			defer mu.Unlock()
-			if err != nil {
-				stats.Failed++
-				errs = append(errs, fmt.Errorf("série %d %s: %w", req.SeriesCode, describe(req), err))
-				logger.Error("consulta falhou", "series", req.SeriesCode, "window", describe(req), "err", err)
-				return nil // não cancela as demais
-			}
-			stats.Saved++
-			if resp.Empty() {
-				stats.Empty++
-			}
-			logger.Info("resposta gravada",
-				"series", req.SeriesCode, "window", describe(req),
-				"status", resp.StatusCode, "bytes", len(resp.Body), "took_ms", time.Since(start).Milliseconds())
-			return nil
-		})
-	}
-
-	_ = g.Wait() // as goroutines nunca devolvem erro; eles ficam em errs
-	return stats, errors.Join(errs...)
-}
-
-func describe(req sgs.Request) string {
-	if req.Start.IsZero() {
-		return "histórico completo"
-	}
-	return req.Start.Format(time.DateOnly) + "→" + req.End.Format(time.DateOnly)
+// sha256Hex devolve o SHA-256 de b em hexadecimal: a "impressão digital" do
+// conteúdo, usada para não gravar de novo o que não mudou.
+func sha256Hex(b []byte) string {
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
 }
