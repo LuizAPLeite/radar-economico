@@ -56,3 +56,60 @@ export async function getSeries(id: string): Promise<Point[]> {
   const body = await getJSON<{ data: Point[] }>(path);
   return body.data;
 }
+
+// --- Combustíveis ---------------------------------------------------------------
+
+export interface Fuel {
+  id: string;
+  name: string;
+  unit: string;
+  updated_at: string;
+}
+
+/** Média de uma semana. `week_start` é a segunda-feira (AAAA-MM-DD). */
+export interface WeekPrice {
+  week_start: string;
+  avg_price: number;
+  n_stations: number;
+}
+
+export interface FuelWithLatest extends Fuel {
+  latest: WeekPrice;
+}
+
+/** Preço de um combustível num município, num mês. */
+export interface MunicipalPrice {
+  ibge_code: number;
+  name: string;
+  uf: string;
+  latitude: number;
+  longitude: number;
+  avg_price: number;
+  min_price: number;
+  max_price: number;
+  n_stations: number;
+}
+
+export interface FuelMunicipalities {
+  month: string | null; // AAAA-MM
+  available_months: string[];
+  data: MunicipalPrice[];
+}
+
+export async function listFuels(): Promise<FuelWithLatest[]> {
+  const body = await getJSON<{ data: FuelWithLatest[] }>("/v1/fuels");
+  return body.data;
+}
+
+/** Série semanal no Brasil ("BR") ou numa UF. */
+export async function getFuelPrices(id: string, scope: string): Promise<WeekPrice[]> {
+  const path = `/v1/fuels/${encodeURIComponent(id)}/prices?scope=${encodeURIComponent(scope)}`;
+  const body = await getJSON<{ data: WeekPrice[] }>(path);
+  return body.data;
+}
+
+/** Preço por município num mês (null = o mais recente). */
+export async function getFuelMunicipalities(id: string, month: string | null): Promise<FuelMunicipalities> {
+  const query = month ? `?month=${encodeURIComponent(month)}` : "";
+  return getJSON<FuelMunicipalities>(`/v1/fuels/${encodeURIComponent(id)}/municipalities${query}`);
+}
