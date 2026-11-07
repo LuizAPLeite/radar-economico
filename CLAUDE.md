@@ -96,6 +96,22 @@ Qualidade e clareza importam mais que quantidade de features.
   recusa HEAD (403) e é lento (~200 KB/s): só GET, 2 downloads por vez,
   coleta incremental (só baixa meses novos + os mais recentes).
 
+- Pipeline com três jobs independentes (`bcb`, `ibge`, `anp`, nessa ordem;
+  `PIPELINE_JOBS` escolhe): um que falha não impede os outros. O job da ANP
+  lê os municípios que o do IBGE gravou em `staging.municipalities`.
+- `pg.copy_frame`: COPY em formato CSV (polars `write_csv`), compartilhado.
+  Staging grande (`staging.fuel_prices`) é esvaziado com TRUNCATE; a mart,
+  lida pela API, com DELETE (MVCC). `mart.municipalities` é atualizada com
+  upsert (é referenciada por chave estrangeira).
+- ANP no pipeline: produto ou unidade fora do catálogo (`anp/products.py`) e
+  município sem par no IBGE fazem o job falhar; exceções de nome em
+  `MUNICIPALITY_EXCEPTIONS` (`anp/transform.py`). Cópias idênticas (mesmo
+  posto, produto, dia e preço) são removidas; preços diferentes no mesmo
+  dia falham.
+- Média semanal: semana começa na segunda; semanas com menos de 50% da
+  mediana de postos do produto (ex.: bordas de um mês que a ANP não
+  publicou) saem do Brasil e de todas as UFs.
+
 ## Regra de arquitetura
 Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
 (raw → staging → mart). A API só lê `mart`.

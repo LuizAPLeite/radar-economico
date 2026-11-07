@@ -46,8 +46,14 @@ Além de Postgres e Redis, o `docker compose up` sobe:
    combustíveis por posto, últimos 12 meses) e grava tudo, intacto, no schema
    `raw`. A primeira coleta da ANP leva alguns minutos: o servidor é lento;
    as seguintes só baixam o que mudou;
-2. **pipeline** (roda uma vez, depois do collector): lê a coleta mais recente,
-   valida e grava `staging.bcb_sgs_observations` e `mart.indicator_values`;
+2. **pipeline** (roda uma vez, depois do collector): três jobs, cada um lendo
+   o `raw`, validando com pandera e gravando `staging` e `mart`:
+   - **bcb**: indicadores (`mart.indicator_values`);
+   - **ibge**: municípios com coordenadas (`mart.municipalities`);
+   - **anp**: ~780 mil preços por posto (`staging.fuel_prices`), casados com os
+     municípios do IBGE, e as médias semanais por UF e Brasil
+     (`mart.fuel_prices_weekly`) e mensais por município
+     (`mart.fuel_prices_municipal`). Leva uns 7 segundos;
 3. **api** (fica no ar): serve a mart em http://localhost:8080;
 4. **web** (fica no ar): o dashboard em **http://localhost:3000**.
 
@@ -58,12 +64,14 @@ só reprocessar o raw:
 docker compose up collector pipeline
 docker compose run --rm --no-deps -e COLLECTOR_SOURCES=ibge collector
 docker compose run --rm --no-deps pipeline
+docker compose run --rm --no-deps -e PIPELINE_JOBS=anp pipeline
 ```
 
 Para ver os dados prontos:
 
 ```bash
 docker compose exec postgres psql -U radar -c "SELECT * FROM mart.indicators"
+docker compose exec postgres psql -U radar -c "SELECT * FROM mart.fuel_prices_weekly WHERE scope = 'BR' ORDER BY week_start DESC LIMIT 6"
 ```
 
 Cada componente:
