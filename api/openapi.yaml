@@ -1,0 +1,226 @@
+openapi: 3.1.0
+info:
+  title: Radar Econômico API
+  version: 0.1.0
+  description: |
+    API REST somente leitura com indicadores econômicos do Brasil.
+
+    Os dados vêm do Banco Central (API SGS), passam pelo pipeline
+    raw → staging → mart e são servidos a partir do schema `mart`.
+    Todas as respostas de erro seguem o formato `Error`.
+servers:
+  - url: http://localhost:8080
+    description: Desenvolvimento local (docker compose)
+
+paths:
+  /health:
+    get:
+      operationId: health
+      summary: Verifica se a API está no ar
+      responses:
+        "200":
+          description: API no ar
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    const: ok
+
+  /v1/indicators:
+    get:
+      operationId: listIndicators
+      summary: Lista os indicadores, cada um com o valor mais recente
+      responses:
+        "200":
+          description: Indicadores disponíveis
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IndicatorWithLatest"
+              example:
+                data:
+                  - id: usd_brl
+                    name: Dólar comercial (venda)
+                    unit: R$/US$
+                    frequency: daily
+                    source: BCB
+                    source_code: "1"
+                    updated_at: "2026-11-07T18:39:18Z"
+                    latest:
+                      date: "2026-11-06"
+                      value: 5.5013
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/indicators/{id}/values:
+    get:
+      operationId: listIndicatorValues
+      summary: Série histórica de um indicador
+      description: |
+        Valores em ordem cronológica. Sem `from` e `to`, devolve a série inteira
+        (a mais longa, a meta Selic, tem um valor por dia desde 2000).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identificador do indicador
+          schema:
+            type: string
+            examples: [selic, ipca, usd_brl]
+        - name: from
+          in: query
+          description: Data inicial, inclusiva (AAAA-MM-DD)
+          schema:
+            type: string
+            format: date
+            examples: ["2026-01-01"]
+        - name: to
+          in: query
+          description: Data final, inclusiva (AAAA-MM-DD)
+          schema:
+            type: string
+            format: date
+            examples: ["2026-11-07"]
+      responses:
+        "200":
+          description: Série do indicador no intervalo pedido (pode ser vazia)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [indicator, data]
+                properties:
+                  indicator:
+                    $ref: "#/components/schemas/Indicator"
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Point"
+              example:
+                indicator:
+                  id: usd_brl
+                  name: Dólar comercial (venda)
+                  unit: R$/US$
+                  frequency: daily
+                  source: BCB
+                  source_code: "1"
+                  updated_at: "2026-11-07T18:39:18Z"
+                data:
+                  - date: "2026-11-05"
+                    value: 5.4621
+                  - date: "2026-11-06"
+                    value: 5.5013
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  schemas:
+    Indicator:
+      type: object
+      required: [id, name, unit, frequency, source, source_code, updated_at]
+      properties:
+        id:
+          type: string
+          examples: [usd_brl]
+        name:
+          type: string
+          examples: [Dólar comercial (venda)]
+        unit:
+          type: string
+          examples: [R$/US$]
+        frequency:
+          type: string
+          enum: [daily, monthly]
+        source:
+          type: string
+          description: Instituição de origem
+          examples: [BCB]
+        source_code:
+          type: string
+          description: Código da série na fonte (no BCB, o código do SGS)
+          examples: ["1"]
+        updated_at:
+          type: string
+          format: date-time
+          description: Quando o pipeline atualizou os dados deste indicador (UTC)
+
+    IndicatorWithLatest:
+      allOf:
+        - $ref: "#/components/schemas/Indicator"
+        - type: object
+          required: [latest]
+          properties:
+            latest:
+              $ref: "#/components/schemas/Point"
+
+    Point:
+      type: object
+      required: [date, value]
+      properties:
+        date:
+          type: string
+          format: date
+        value:
+          type: number
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Código estável, para programas
+              examples: [not_found]
+            message:
+              type: string
+              description: Descrição para pessoas, em português
+
+  responses:
+    BadRequest:
+      description: Parâmetro inválido
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error:
+              code: invalid_parameter
+              message: 'parâmetro from inválido ("07/11/2026"): use AAAA-MM-DD'
+    NotFound:
+      description: Indicador ou rota inexistente
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error:
+              code: not_found
+              message: indicador "xyz" não encontrado
+    InternalError:
+      description: Erro interno (o detalhe fica só no log do servidor)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error:
+              code: internal
+              message: erro interno; tente novamente
