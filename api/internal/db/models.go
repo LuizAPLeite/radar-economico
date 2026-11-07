@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+type MartFuelProduct struct {
+	ID        string
+	Name      string
+	Unit      string
+	UpdatedAt time.Time
+}
+
 type MartIndicator struct {
 	ID          string
 	Name        string

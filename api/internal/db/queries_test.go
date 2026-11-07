@@ -12,10 +12,11 @@ import (
 	"github.com/LuizAPLeite/radar-economico/api/internal/db"
 )
 
-// Teste de integração das queries geradas pelo sqlc, num Postgres de verdade.
-// Tudo roda dentro de uma transação que nunca é confirmada: o Rollback do
-// final devolve o banco exatamente ao estado anterior.
-func TestQueries(t *testing.T) {
+// beginTestTx abre uma transação num Postgres de verdade para um teste de
+// integração. Ela nunca é confirmada: o Rollback no fim do teste devolve o
+// banco exatamente ao estado anterior. Sem TEST_DATABASE_URL, o teste é pulado.
+func beginTestTx(t *testing.T) (context.Context, pgx.Tx) {
+	t.Helper()
 	url := os.Getenv("TEST_DATABASE_URL")
 	if url == "" {
 		t.Skip("TEST_DATABASE_URL não definida; pulando teste de integração")
@@ -26,13 +27,29 @@ func TestQueries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close(ctx)
-
 	tx, err := conn.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tx.Rollback(ctx) // proposital: o teste nunca confirma o que gravou
+	// t.Cleanup roda na ordem inversa do registro: primeiro o rollback, depois o close.
+	t.Cleanup(func() { _ = conn.Close(ctx) })
+	t.Cleanup(func() { _ = tx.Rollback(ctx) })
+	return ctx, tx
+}
+
+// mustExec executa comandos de preparação e interrompe o teste no primeiro erro.
+func mustExec(t *testing.T, ctx context.Context, tx pgx.Tx, stmts ...string) {
+	t.Helper()
+	for _, stmt := range stmts {
+		if _, err := tx.Exec(ctx, stmt); err != nil {
+			t.Fatalf("preparando dados: %v\n%s", err, stmt)
+		}
+	}
+}
+
+// Teste de integração das queries de indicadores geradas pelo sqlc.
+func TestQueries(t *testing.T) {
+	ctx, tx := beginTestTx(t)
 
 	// Começa de uma mart vazia (só dentro da transação) e insere dados conhecidos.
 	for _, stmt := range []string{
