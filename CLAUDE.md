@@ -71,15 +71,19 @@ Qualidade e clareza importam mais que quantidade de features.
   gráficos (sem zoom por gráfico); tabela acessível ao lado de cada gráfico.
 - Web: testes de funções puras com `node --test` (Node 26 roda TS direto,
   imports com extensão `.ts`); imagem Docker com `output: "standalone"`.
-- Deploy (tudo em São Paulo): Neon Free (Postgres 16, `sa-east-1`), API no
-  Fly.io (`gru`, auto-stop, menor máquina), web na Vercel Hobby (`gru1`, raiz
-  `web`). Coleta em produção pelo workflow manual `data.yml`.
+- Deploy ADIADO por decisão de custo (nov/2026): a configuração está pronta,
+  mas nada foi publicado. Publicar quando o usuário decidir; Neon e Vercel são
+  grátis, só a API no Fly.io custa (~US$ 2/mês, exige cartão). Revisar os
+  preços na hora, ou considerar um host gratuito para a API.
+- Deploy planejado (tudo em São Paulo): Neon Free (Postgres 16, `sa-east-1`),
+  API no Fly.io (`gru`, auto-stop, menor máquina), web na Vercel Hobby (`gru1`,
+  raiz `web`). Coleta em produção pelo workflow manual `data.yml`.
 - Neon: usar a connection string DIRETA (sem `-pooler`): o pooler recusa o
   parâmetro `default_transaction_read_only` que a API envia ao conectar.
   O Neon dorme após 5 min sem consultas e derruba as conexões, por isso o
   pool da API fecha conexões ociosas após 1 min.
-- Plano grátis do Neon tem 100 CU-horas/mês: a API terá cache em memória
-  (`api/internal/cache`) para não acordar o banco a cada visita.
+- Plano grátis do Neon tem 100 CU-horas/mês: antes de publicar, a API precisa
+  de cache em memória (`api/internal/cache`) para não acordar o banco a cada visita.
 
 ## Regra de arquitetura
 Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
@@ -88,13 +92,15 @@ Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
 ## Roteiro
 - Fase 0: monorepo, Docker Compose (Postgres + Redis), migrations, CI básico.
 - Fase 1: Banco Central (Selic, IPCA, dólar) de ponta a ponta, com deploy. ← MVP
-- Fase 2: ANP (combustíveis) + filtros + mapa por município.
+  Concluída localmente; o deploy ficou para depois (ver "Decisões tomadas").
+- Fase 2: ANP (combustíveis) + filtros + mapa por município. ← atual
 - Fase 3: cargas incrementais, testes, validação de dados, cache, coleta agendada,
   endpoint de saúde dos dados.
 - Fase 4: análises (previsão de preços, correlação dólar × gasolina).
 - Fase 5: assistente com LLM (pergunta em português → SQL → resposta + gráfico).
 - Fase 6: README caprichado, diagrama, GIF de demo.
-Não avançar de fase sem a anterior estar funcionando.
+Não avançar de fase sem a anterior estar funcionando (exceção combinada: o
+deploy da Fase 1 fica para quando o usuário decidir gastar).
 
 ## Como trabalhamos juntos
 - Estou aprendendo Go; explique as decisões e os padrões idiomáticos quando
