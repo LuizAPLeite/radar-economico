@@ -43,6 +43,9 @@ jobs:
             echo "Arquivos fora do gofmt:"; echo "$unformatted"; exit 1
           fi
       - run: go vet ./collector/... ./api/...
+      # Falha se alguém mudou uma query (ou o schema) e não gerou o código de novo.
+      - name: Código gerado pelo sqlc está atualizado
+        run: docker run --rm -v "$PWD:/src" -w /src/api sqlc/sqlc:1.31.1 diff
       - name: Aplica as migrations no banco de teste
         run: |
           docker run --rm --network host -v "$PWD/db/migrations:/migrations:ro" \
@@ -50,6 +53,8 @@ jobs:
       - run: go test -race ./collector/... ./api/...
       - name: Build da imagem do collector
         run: docker build -t collector ./collector
+      - name: Build da imagem da api
+        run: docker build -t api ./api
 
   python:
     name: Python (pipeline)
