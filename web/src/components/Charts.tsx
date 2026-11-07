@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { PERIODS, periodStart, type PeriodId } from "@/lib/indicators";
 import { ChartPanel, type ChartSeries } from "./ChartPanel";
+import { chipClass } from "./controls";
 
 /**
  * Os gráficos com um seletor de período único: os três mostram sempre a
@@ -31,13 +32,7 @@ export function Charts({ series, seriesStart }: { series: ChartSeries[]; seriesS
               type="button"
               aria-pressed={selected}
               onClick={() => setPeriod(p.id)}
-              className={
-                "rounded-full border px-3 py-1 text-sm transition-colors focus-visible:outline-2 " +
-                "focus-visible:outline-offset-2 focus-visible:outline-series " +
-                (selected
-                  ? "border-ink bg-ink font-medium text-page"
-                  : "border-hairline text-ink-2 hover:bg-hover hover:text-ink")
-              }
+              className={chipClass(selected)}
             >
               {p.label}
             </button>
