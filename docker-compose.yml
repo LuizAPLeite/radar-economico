@@ -54,5 +54,17 @@ services:
       COLLECTOR_CONCURRENCY: ${COLLECTOR_CONCURRENCY:-4}
     restart: "no"
 
+  # Lê a coleta mais recente do raw e grava staging e mart. Roda depois do
+  # collector, mas os dois só conversam pelo banco: o pipeline também
+  # funciona sozinho, sobre o que já estiver no raw.
+  pipeline:
+    build: ./pipeline
+    depends_on:
+      collector:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-radar}:${POSTGRES_PASSWORD:-radar}@postgres:5432/${POSTGRES_DB:-radar}?sslmode=disable
+    restart: "no"
+
 volumes:
   pgdata:
