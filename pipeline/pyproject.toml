@@ -6,10 +6,11 @@ requires-python = ">=3.13"
 dependencies = [
     "pandera[polars]>=0.35.0",
     "polars>=2.1.0",
+    "psycopg[binary]>=3.3.8",
 ]
 
 [project.scripts]
-radar-pipeline = "radar_pipeline:main"
+radar-pipeline = "radar_pipeline.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.13.7,<0.14.0"]
