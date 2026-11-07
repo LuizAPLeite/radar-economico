@@ -52,6 +52,14 @@ Qualidade e clareza importam mais que quantidade de features.
   (numeric). Datas após o dia da coleta (horário de Brasília) não entram.
 - Testes de integração Python usam a mesma `TEST_DATABASE_URL` e rodam numa
   transação com `force_rollback`: não deixam rastro no banco.
+- API: chi + pgx + sqlc. Queries em `api/queries/`, código gerado em
+  `api/internal/db` com sqlc via Docker (`sqlc/sqlc:1.31.1`); CI roda
+  `sqlc diff`. numeric → float64 na API; datas como `AAAA-MM-DD`.
+- API conecta com `default_transaction_read_only=on`: o Postgres recusa escrita.
+- Rotas: `/health`, `/v1/indicators`, `/v1/indicators/{id}/values?from&to`,
+  `/openapi.yaml` (spec embutida com go:embed). Erros sempre
+  `{"error":{"code","message"}}`; 500 nunca expõe o erro interno.
+- Cache Redis na API fica para a Fase 3.
 
 ## Regra de arquitetura
 Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
