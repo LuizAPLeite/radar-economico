@@ -59,9 +59,13 @@ go test ./collector/... ./api/...      # Go (a partir da raiz, via go.work)
 # com testes de integração (precisa do Postgres do compose rodando):
 TEST_DATABASE_URL=postgres://radar:radar@localhost:5432/radar?sslmode=disable go test ./collector/...
 go run ./api                            # API em http://localhost:8080/health
-cd pipeline && uv run pytest            # pipeline (integração: mesma TEST_DATABASE_URL)
+uv run --directory pipeline pytest      # pipeline (integração: mesma TEST_DATABASE_URL)
 cd web && npm install && npm run dev    # front em http://localhost:3000
 ```
+
+> **No PowerShell**, a sintaxe `VAR=valor comando` não existe. Defina a variável
+> antes, e ela vale para os próximos comandos no mesmo terminal:
+> `$env:TEST_DATABASE_URL="postgres://radar:radar@localhost:5432/radar?sslmode=disable"`
 
 ## Migrations
 
