@@ -32,6 +32,19 @@ def latest_files(conn: psycopg.Connection) -> list[RawFile]:
     return [RawFile(*row) for row in rows]
 
 
+def last_national_weeks(conn: psycopg.Connection) -> dict[str, date]:
+    """Semana mais recente de cada produto na mart (antes da carga nova)."""
+    rows = conn.execute(
+        """
+        SELECT product_id, max(week_start)
+          FROM mart.fuel_prices_weekly
+         WHERE scope = 'BR'
+         GROUP BY product_id
+        """
+    ).fetchall()
+    return dict(rows)
+
+
 def municipalities(conn: psycopg.Connection) -> pl.DataFrame:
     """Os municípios do IBGE (gravados pelo job do IBGE), para casar os nomes."""
     rows = conn.execute("SELECT ibge_code, name, uf FROM staging.municipalities").fetchall()

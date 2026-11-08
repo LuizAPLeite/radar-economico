@@ -8,7 +8,7 @@ from datetime import date, datetime
 import polars as pl
 import psycopg
 
-from radar_pipeline.bcb import extract, load, transform
+from radar_pipeline.bcb import extract, load, quality, transform
 
 log = logging.getLogger(__name__)
 
@@ -54,6 +54,11 @@ def run(conn: psycopg.Connection) -> Summary | None:
     if mart.unknown_series:
         log.warning("séries fora do catálogo (ficam só no staging): %s", mart.unknown_series)
 
+    # Avisos não impedem a carga: vão para o log e para o registro da execução.
+    warnings = quality.check_steps(mart.frame, extract.last_dates(conn))
+    for warning in warnings:
+        log.warning("aviso: %s", warning)
+
     load.replace_all(conn, staging.frame, mart.frame, latest.id)
 
     for row in _latest_values(mart.frame).iter_rows(named=True):
@@ -71,6 +76,7 @@ def run(conn: psycopg.Connection) -> Summary | None:
         as_of=latest.as_of,
         staging_rows=staging.frame.height,
         mart_rows=mart.frame.height,
+        warnings=tuple(warnings),
     )
 
 

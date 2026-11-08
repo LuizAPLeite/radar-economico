@@ -35,6 +35,14 @@ def latest_successful_run(conn: psycopg.Connection) -> Run | None:
     return Run(*row) if row else None
 
 
+def last_dates(conn: psycopg.Connection) -> dict[str, date]:
+    """Data do último valor de cada indicador na mart (antes da carga nova)."""
+    rows = conn.execute(
+        "SELECT indicator_id, max(ref_date) FROM mart.indicator_values GROUP BY indicator_id"
+    ).fetchall()
+    return dict(rows)
+
+
 def read_responses(conn: psycopg.Connection, run_id: int) -> pl.DataFrame:
     """Respostas de uma coleta, com o payload como texto JSON."""
     rows = conn.execute(

@@ -9,7 +9,7 @@ from datetime import datetime
 import polars as pl
 import psycopg
 
-from radar_pipeline.anp import extract, load, transform
+from radar_pipeline.anp import extract, load, quality, transform
 
 log = logging.getLogger(__name__)
 
@@ -64,6 +64,13 @@ def run(conn: psycopg.Connection) -> Summary | None:
         municipal.height,
     )
 
+    # Avisos não impedem a carga: vão para o log e para o registro da execução.
+    warnings = quality.check_month_volumes(staging.frame) + quality.check_new_weeks(
+        weekly, extract.last_national_weeks(conn)
+    )
+    for warning in warnings:
+        log.warning("aviso: %s", warning)
+
     load.replace_all(conn, staging.frame, weekly, municipal)
 
     for row in _latest_national(weekly).iter_rows(named=True):
@@ -83,6 +90,7 @@ def run(conn: psycopg.Connection) -> Summary | None:
         duplicates_removed=staging.duplicates_removed,
         weekly_rows=weekly.height,
         municipal_rows=municipal.height,
+        warnings=tuple(warnings),
     )
 
 

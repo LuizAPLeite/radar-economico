@@ -14,6 +14,7 @@ import pytest
 from pandera.errors import SchemaErrors
 
 from radar_pipeline.bcb import job
+from radar_pipeline.cli import run_job
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get("TEST_DATABASE_URL"), reason="TEST_DATABASE_URL não definida"
@@ -137,3 +138,26 @@ def test_invalid_data_does_not_touch_mart(conn):
     # A mart continua com os dados da coleta anterior, intactos.
     assert count(conn, "SELECT count(*) FROM mart.indicator_values") == 5
     assert count(conn, "SELECT min(source_run_id) FROM mart.indicators") == good_run
+
+
+def test_big_jump_is_loaded_and_recorded_as_a_warning(conn):
+    insert_run(conn, LATE_NIGHT, VALID_RESPONSES)
+    assert run_job(conn, "bcb", job.run)
+
+    # Coleta seguinte com o dólar 12,7% acima do último valor: pode ser real,
+    # então entra na mart, mas fica um aviso no registro da execução.
+    insert_run(
+        conn,
+        datetime(2026, 11, 9, 20, 0, tzinfo=BRT),
+        [(1, 200, [obs("06/11/2026", "5.5013"), obs("09/11/2026", "6.2")])],
+    )
+    assert run_job(conn, "bcb", job.run)
+
+    assert count(conn, "SELECT count(*) FROM mart.indicator_values WHERE value = 6.2") == 1
+    warnings = conn.execute(
+        "SELECT warnings FROM mart.pipeline_runs WHERE job = 'bcb' ORDER BY id DESC LIMIT 1"
+    ).fetchone()[0]
+    assert warnings == [
+        "Dólar comercial (venda): de 5,5013 em 06/11/2026 para 6,2 em 09/11/2026, "
+        "variação de +12,7% (limite: 10%)"
+    ]

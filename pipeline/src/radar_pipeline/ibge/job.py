@@ -14,6 +14,10 @@ log = logging.getLogger(__name__)
 # truncada ou um formato novo, e não deve substituir a tabela que já existe.
 MIN_MUNICIPALITIES = 5_000
 
+# Hoje só 1 município (criado depois da malha de centroides do IBGE) fica sem
+# coordenadas. Muitos mais sugerem mudança no arquivo de centroides: vira aviso.
+MAX_WITHOUT_COORDINATES = 10
+
 
 @dataclass(frozen=True)
 class Summary:
@@ -43,14 +47,22 @@ def run(conn: psycopg.Connection) -> Summary | None:
             f"só {frame.height} municípios no raw do IBGE (esperado ≥ {MIN_MUNICIPALITIES})"
         )
 
+    with_coordinates = frame.drop_nulls(["latitude", "longitude"]).height
+    warnings = []
+    if (missing := frame.height - with_coordinates) > MAX_WITHOUT_COORDINATES:
+        warnings.append(f"{missing} municípios sem coordenadas no IBGE: ficam fora do mapa")
+    for warning in warnings:
+        log.warning("aviso: %s", warning)
+
     changed = load.replace(conn, frame)
 
     summary = Summary(
         source_run_id=max(municipios.run_id, centroides.run_id),
         source_collected_at=max(municipios.fetched_at, centroides.fetched_at),
         municipalities=frame.height,
-        with_coordinates=frame.drop_nulls(["latitude", "longitude"]).height,
+        with_coordinates=with_coordinates,
         changed_in_mart=changed,
+        warnings=tuple(warnings),
     )
     log.info(
         "municípios: %d, com coordenadas: %d, alterados na mart: %d",
