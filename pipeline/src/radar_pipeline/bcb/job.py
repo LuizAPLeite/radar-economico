@@ -3,7 +3,7 @@ staging e mart."""
 
 import logging
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
 import polars as pl
 import psycopg
@@ -15,10 +15,16 @@ log = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class Summary:
-    run_id: int
+    source_run_id: int  # coleta processada (raw.collection_runs.id)
+    source_collected_at: datetime
     as_of: date
     staging_rows: int
     mart_rows: int
+    warnings: tuple[str, ...] = ()
+
+    @property
+    def rows_written(self) -> int:
+        return self.mart_rows
 
 
 def run(conn: psycopg.Connection) -> Summary | None:
@@ -60,7 +66,8 @@ def run(conn: psycopg.Connection) -> Summary | None:
         )
 
     return Summary(
-        run_id=latest.id,
+        source_run_id=latest.id,
+        source_collected_at=latest.started_at,
         as_of=latest.as_of,
         staging_rows=staging.frame.height,
         mart_rows=mart.frame.height,

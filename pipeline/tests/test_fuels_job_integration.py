@@ -104,9 +104,12 @@ def test_ibge_and_anp_jobs_fill_staging_and_mart(conn):
 
     ibge = ibge_job.run(conn)
     assert ibge.municipalities == 5_003 and ibge.with_coordinates == 5_003
+    # Rodar de novo com o mesmo raw não reescreve nenhum município na mart.
+    assert ibge_job.run(conn).rows_written == 0
 
     anp = anp_job.run(conn)
     assert (anp.files, anp.staging_rows, anp.duplicates_removed) == (1, 4, 1)
+    assert anp.rows_written == anp.weekly_rows + anp.municipal_rows
 
     assert fetch(
         conn, "SELECT product, ibge_code, price::text FROM staging.fuel_prices ORDER BY cnpj"

@@ -77,7 +77,8 @@ def test_job_fills_staging_and_mart(conn):
     summary = job.run(conn)
 
     assert summary is not None
-    assert summary.run_id == run_id
+    assert summary.source_run_id == run_id
+    assert summary.source_collected_at == LATE_NIGHT
     assert summary.as_of == date(2026, 11, 7)
 
     # staging tem tudo, inclusive a data futura e a série fora do catálogo

@@ -1,7 +1,7 @@
 """Leitura dos arquivos da ANP no raw e dos municípios no staging."""
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
 import polars as pl
 import psycopg
@@ -10,6 +10,8 @@ import psycopg
 @dataclass(frozen=True)
 class RawFile:
     id: int
+    run_id: int  # coleta que gravou esta versão (raw.collection_runs.id)
+    fetched_at: datetime
     product_group: str
     ref_month: date
     content_gzip: bytes
@@ -21,7 +23,8 @@ def latest_files(conn: psycopg.Connection) -> list[RawFile]:
     de CSV na memória ao mesmo tempo."""
     rows = conn.execute(
         """
-        SELECT DISTINCT ON (product_group, ref_month) id, product_group, ref_month, content_gzip
+        SELECT DISTINCT ON (product_group, ref_month)
+               id, run_id, fetched_at, product_group, ref_month, content_gzip
           FROM raw.anp_files
          ORDER BY product_group, ref_month, fetched_at DESC, id DESC
         """

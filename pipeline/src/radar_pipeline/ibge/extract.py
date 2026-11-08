@@ -1,11 +1,20 @@
 """Leitura das respostas do IBGE no raw."""
 
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import psycopg
 
 
-def latest_payloads(conn: psycopg.Connection) -> dict[str, Any]:
+@dataclass(frozen=True)
+class Payload:
+    run_id: int  # coleta que gravou esta versão (raw.collection_runs.id)
+    fetched_at: datetime
+    data: Any  # o JSON da resposta, já como listas e dicionários do Python
+
+
+def latest_payloads(conn: psycopg.Connection) -> dict[str, Payload]:
     """A versão mais recente de cada conjunto ("municipios", "centroides").
 
     O collector só grava uma versão nova quando o conteúdo muda, então a mais
@@ -14,9 +23,11 @@ def latest_payloads(conn: psycopg.Connection) -> dict[str, Any]:
     """
     rows = conn.execute(
         """
-        SELECT DISTINCT ON (dataset) dataset, payload
+        SELECT DISTINCT ON (dataset) dataset, run_id, fetched_at, payload
           FROM raw.ibge_responses
          ORDER BY dataset, fetched_at DESC, id DESC
         """
     ).fetchall()
-    return dict(rows)
+    return {
+        dataset: Payload(run_id, fetched_at, data) for dataset, run_id, fetched_at, data in rows
+    }

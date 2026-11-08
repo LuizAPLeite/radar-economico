@@ -22,15 +22,21 @@ WHERE (mart.municipalities.name, mart.municipalities.uf,
 """
 
 
-def replace(conn: psycopg.Connection, municipalities: pl.DataFrame) -> None:
-    """Grava staging (todos) e mart (só os que têm coordenadas) numa transação."""
+def replace(conn: psycopg.Connection, municipalities: pl.DataFrame) -> int:
+    """Grava staging (todos) e mart (só os que têm coordenadas) numa transação.
+
+    Devolve quantos municípios foram inseridos ou mudaram na mart.
+    """
     with conn.transaction(), conn.cursor() as cur:
         cur.execute("DELETE FROM staging.municipalities")
         copy_frame(cur, ("staging", "municipalities"), municipalities)
 
         with_coordinates = municipalities.drop_nulls(["latitude", "longitude"])
         # executemany manda todas as linhas de uma vez (pipeline do psycopg),
-        # sem esperar a resposta de cada INSERT.
+        # sem esperar a resposta de cada INSERT. O rowcount soma as linhas de
+        # todos eles: as que o WHERE pulou (sem mudança) não contam.
         cur.executemany(_UPSERT_MUNICIPALITY, with_coordinates.rows())
+        changed = cur.rowcount
 
         cur.execute("ANALYZE staging.municipalities, mart.municipalities")
+    return changed

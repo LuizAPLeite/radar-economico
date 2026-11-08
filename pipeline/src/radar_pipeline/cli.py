@@ -10,18 +10,22 @@ import logging
 import os
 import sys
 from collections.abc import Callable
+from datetime import UTC, datetime
 
 import psycopg
 
+from radar_pipeline import runs
 from radar_pipeline.anp import job as anp_job
 from radar_pipeline.bcb import job as bcb_job
 from radar_pipeline.ibge import job as ibge_job
 
 log = logging.getLogger("radar_pipeline")
 
+Job = Callable[[psycopg.Connection], runs.JobSummary | None]
+
 # A ordem importa: o job da ANP casa os municípios com a tabela que o job do
 # IBGE grava. Os jobs não se chamam: cada um lê o que precisa do banco.
-JOBS: dict[str, Callable[[psycopg.Connection], object]] = {
+JOBS: dict[str, Job] = {
     "bcb": bcb_job.run,
     "ibge": ibge_job.run,
     "anp": anp_job.run,
@@ -41,6 +45,42 @@ def select_jobs(value: str | None) -> list[str]:
     return [name for name in JOBS if name in requested]
 
 
+def run_job(conn: psycopg.Connection, name: str, job: Job) -> bool:
+    """Roda um job e grava a execução em mart.pipeline_runs.
+
+    A carga do job e o registro do sucesso vão na mesma transação (a do job
+    vira um SAVEPOINT dentro desta): ou os dois ficam, ou nenhum. Se o job
+    falhar, tudo o que ele gravou é desfeito, e a falha é registrada depois,
+    numa transação própria. Devolve True se o job terminou bem.
+    """
+    started_at = datetime.now(UTC)
+    try:
+        with conn.transaction():
+            summary = job(conn)
+            runs.record(conn, name, started_at, datetime.now(UTC), summary)
+    except Exception as error:
+        log.exception("job %s falhou", name)
+        try:
+            runs.record_failure(conn, name, started_at, datetime.now(UTC), error)
+        except Exception:
+            # Sem conexão com o banco, nem o registro da falha é possível.
+            log.exception("não foi possível registrar a falha do job %s", name)
+        return False
+
+    seconds = (datetime.now(UTC) - started_at).total_seconds()
+    if summary is None:
+        log.info("job %s: nada a processar (%.1f s)", name, seconds)
+    else:
+        log.info(
+            "job %s: %d linhas gravadas na mart, coleta %d (%.1f s)",
+            name,
+            summary.rows_written,
+            summary.source_run_id,
+            seconds,
+        )
+    return True
+
+
 def main() -> None:
     logging.basicConfig(
         level=logging.INFO,
@@ -57,16 +97,13 @@ def main() -> None:
         sys.exit(1)
 
     failed = []
-    # autocommit: leituras não deixam transação aberta; cada gravação abre a
-    # sua própria transação explicitamente (ver os load.py).
+    # autocommit: leituras fora de um job não deixam transação aberta; cada
+    # job roda dentro da sua própria transação (ver run_job).
     with psycopg.connect(database_url, autocommit=True) as conn:
         for name in names:
             # Um job que falha não impede os outros: a mart dele fica como
-            # estava (a transação é desfeita) e as demais seguem atualizadas.
-            try:
-                JOBS[name](conn)
-            except Exception:
-                log.exception("job %s falhou", name)
+            # estava e as demais seguem atualizadas.
+            if not run_job(conn, name, JOBS[name]):
                 failed.append(name)
 
     if failed:

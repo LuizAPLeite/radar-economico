@@ -1,7 +1,7 @@
 """Leitura do schema raw."""
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
 import polars as pl
 import psycopg
@@ -15,6 +15,7 @@ SOURCE = "bcb_sgs"
 @dataclass(frozen=True)
 class Run:
     id: int
+    started_at: datetime
     as_of: date  # data da coleta no horário de Brasília
 
 
@@ -23,7 +24,7 @@ def latest_successful_run(conn: psycopg.Connection) -> Run | None:
     completo, então ela basta para reconstruir staging e mart."""
     row = conn.execute(
         """
-        SELECT id, (started_at AT TIME ZONE 'America/Sao_Paulo')::date
+        SELECT id, started_at, (started_at AT TIME ZONE 'America/Sao_Paulo')::date
           FROM raw.collection_runs
          WHERE source = %s AND status = 'success'
          ORDER BY id DESC
@@ -31,7 +32,7 @@ def latest_successful_run(conn: psycopg.Connection) -> Run | None:
         """,
         (SOURCE,),
     ).fetchone()
-    return Run(id=row[0], as_of=row[1]) if row else None
+    return Run(*row) if row else None
 
 
 def read_responses(conn: psycopg.Connection, run_id: int) -> pl.DataFrame:

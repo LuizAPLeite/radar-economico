@@ -2,6 +2,7 @@
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 
 import psycopg
 
@@ -16,8 +17,16 @@ MIN_MUNICIPALITIES = 5_000
 
 @dataclass(frozen=True)
 class Summary:
+    source_run_id: int  # a coleta mais recente entre os dois conjuntos
+    source_collected_at: datetime
     municipalities: int
     with_coordinates: int
+    changed_in_mart: int  # inseridos ou alterados (quase sempre 0)
+    warnings: tuple[str, ...] = ()
+
+    @property
+    def rows_written(self) -> int:
+        return self.changed_in_mart
 
 
 def run(conn: psycopg.Connection) -> Summary | None:
@@ -27,19 +36,26 @@ def run(conn: psycopg.Connection) -> Summary | None:
         log.warning("raw do IBGE incompleto (faltam: %s); nada a processar", sorted(missing))
         return None
 
-    frame = transform.to_municipalities(payloads["municipios"], payloads["centroides"])
+    municipios, centroides = payloads["municipios"], payloads["centroides"]
+    frame = transform.to_municipalities(municipios.data, centroides.data)
     if frame.height < MIN_MUNICIPALITIES:
         raise ValueError(
             f"só {frame.height} municípios no raw do IBGE (esperado ≥ {MIN_MUNICIPALITIES})"
         )
 
-    load.replace(conn, frame)
+    changed = load.replace(conn, frame)
 
     summary = Summary(
+        source_run_id=max(municipios.run_id, centroides.run_id),
+        source_collected_at=max(municipios.fetched_at, centroides.fetched_at),
         municipalities=frame.height,
         with_coordinates=frame.drop_nulls(["latitude", "longitude"]).height,
+        changed_in_mart=changed,
     )
     log.info(
-        "municípios: %d, com coordenadas: %d", summary.municipalities, summary.with_coordinates
+        "municípios: %d, com coordenadas: %d, alterados na mart: %d",
+        summary.municipalities,
+        summary.with_coordinates,
+        summary.changed_in_mart,
     )
     return summary

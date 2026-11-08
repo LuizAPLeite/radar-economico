@@ -4,6 +4,7 @@ grava staging e mart."""
 import gzip
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 
 import polars as pl
 import psycopg
@@ -15,11 +16,20 @@ log = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class Summary:
+    # Os arquivos podem vir de coletas diferentes (cada coleta só grava os
+    # meses que mudaram): vale a mais recente entre eles.
+    source_run_id: int
+    source_collected_at: datetime
     files: int
     staging_rows: int
     duplicates_removed: int
     weekly_rows: int
     municipal_rows: int
+    warnings: tuple[str, ...] = ()
+
+    @property
+    def rows_written(self) -> int:
+        return self.weekly_rows + self.municipal_rows
 
 
 def run(conn: psycopg.Connection) -> Summary | None:
@@ -66,6 +76,8 @@ def run(conn: psycopg.Connection) -> Summary | None:
         )
 
     return Summary(
+        source_run_id=max(f.run_id for f in files),
+        source_collected_at=max(f.fetched_at for f in files),
         files=len(files),
         staging_rows=staging.frame.height,
         duplicates_removed=staging.duplicates_removed,
