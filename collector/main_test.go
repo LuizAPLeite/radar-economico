@@ -83,3 +83,22 @@ func TestLoadConfig_Sources(t *testing.T) {
 		t.Errorf("sources = %q, quer [ibge bcb_sgs] (sem espaços nem repetidos)", cfg.sources)
 	}
 }
+
+func TestLoadConfig_SGSFullHistory(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://x")
+
+	cfg, err := loadConfig()
+	if err != nil || cfg.sgsFullHistory {
+		t.Errorf("sem a variável: sgsFullHistory = %v, err = %v (quer coleta incremental)", cfg.sgsFullHistory, err)
+	}
+
+	t.Setenv("SGS_FULL_HISTORY", "true")
+	if cfg, err := loadConfig(); err != nil || !cfg.sgsFullHistory {
+		t.Errorf("com true: sgsFullHistory = %v, err = %v", cfg.sgsFullHistory, err)
+	}
+
+	t.Setenv("SGS_FULL_HISTORY", "sim")
+	if _, err := loadConfig(); err == nil {
+		t.Error("esperava erro para um valor que não é booleano")
+	}
+}

@@ -39,15 +39,57 @@ type SGSSaver interface {
 	SaveResponse(ctx context.Context, runID int64, resp sgs.Response) error
 }
 
-// BuildRequests transforma a lista de séries em consultas: séries diárias
-// viram uma consulta por janela de até 10 anos entre start e end; as demais
-// viram uma única consulta sem datas (a API devolve o histórico inteiro).
-func BuildRequests(series []Series, start, end time.Time) []sgs.Request {
+// Margem da coleta incremental, em dias: cada coleta volta este tanto antes
+// do que já foi buscado, para pegar valores publicados com atraso ou
+// corrigidos pelo BCB. O IPCA de um mês sai por volta do dia 10 do mês
+// seguinte, por isso a margem da série mensal é maior.
+const (
+	DailyOverlapDays   = 30
+	MonthlyOverlapDays = 120
+)
+
+// IncrementalStarts diz de que data cada série começa nesta coleta, a partir
+// de até onde as coletas anteriores já foram (coverage, ver
+// store.BCBCoverage), voltando a margem. Uma série que nunca foi coletada
+// fica de fora do resultado: ela busca o histórico completo.
+func IncrementalStarts(series []Series, coverage map[int]time.Time, historyStart time.Time) map[int]time.Time {
+	since := make(map[int]time.Time)
+	for _, s := range series {
+		until, ok := coverage[s.Code]
+		if !ok {
+			continue
+		}
+		overlap := MonthlyOverlapDays
+		if s.Daily {
+			overlap = DailyOverlapDays
+		}
+		start := until.AddDate(0, 0, -overlap)
+		if start.Before(historyStart) {
+			start = historyStart
+		}
+		since[s.Code] = start
+	}
+	return since
+}
+
+// BuildRequests transforma a lista de séries em consultas até end.
+//
+// Uma série com data em since (coleta incremental) busca só a partir dela.
+// As demais buscam o histórico completo: as diárias desde historyStart, em
+// janelas de até 10 anos (limite da API); as mensais numa consulta só, sem
+// datas (a API devolve tudo). since nil quer dizer histórico completo para todas.
+func BuildRequests(series []Series, since map[int]time.Time, historyStart, end time.Time) []sgs.Request {
 	var reqs []sgs.Request
 	for _, s := range series {
-		if !s.Daily {
-			reqs = append(reqs, sgs.Request{SeriesCode: s.Code})
-			continue
+		// Ler uma chave que não existe num map devolve o valor zero e false,
+		// inclusive num map nil: não precisa conferir antes.
+		start, incremental := since[s.Code]
+		if !incremental {
+			if !s.Daily {
+				reqs = append(reqs, sgs.Request{SeriesCode: s.Code})
+				continue
+			}
+			start = historyStart
 		}
 		for _, w := range sgs.SplitWindows(start, end, sgs.MaxDailyWindowYears) {
 			reqs = append(reqs, sgs.Request{SeriesCode: s.Code, Start: w.Start, End: w.End})

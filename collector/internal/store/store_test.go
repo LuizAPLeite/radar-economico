@@ -102,6 +102,62 @@ func TestStore_ANPFiles(t *testing.T) {
 	}
 }
 
+func TestStore_BCBCoverage(t *testing.T) {
+	s, pool := newTestStore(t)
+	ctx := context.Background()
+
+	// Códigos de série que não existem no SGS, para não se misturar com os
+	// dados reais do banco de desenvolvimento.
+	const daily, monthly = 90001, 90002
+	day := func(y int, m time.Month, d int) time.Time { return time.Date(y, m, d, 0, 0, 0, 0, time.UTC) }
+	save := func(runErr error, responses ...sgs.Response) {
+		t.Helper()
+		runID, err := s.StartRun(ctx, "test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			_, _ = pool.Exec(ctx, `DELETE FROM raw.bcb_sgs_responses WHERE run_id = $1`, runID)
+			_, _ = pool.Exec(ctx, `DELETE FROM raw.collection_runs WHERE id = $1`, runID)
+		})
+		for _, r := range responses {
+			if err := s.SaveResponse(ctx, runID, r); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := s.FinishRun(ctx, runID, runErr); err != nil {
+			t.Fatal(err)
+		}
+	}
+	window := func(code int, start, end time.Time) sgs.Response {
+		return sgs.Response{
+			Request: sgs.Request{SeriesCode: code, Start: start, End: end},
+			URL:     "http://exemplo", StatusCode: 200, Body: []byte(`[]`),
+		}
+	}
+
+	save(nil,
+		window(daily, day(2016, 11, 7), day(2026, 11, 6)),
+		sgs.Response{Request: sgs.Request{SeriesCode: monthly}, URL: "http://exemplo", StatusCode: 200, Body: []byte(`[]`)},
+	)
+	// Uma coleta que falhou não conta, mesmo indo mais longe.
+	save(errors.New("falha de teste"), window(daily, day(2099, 1, 1), day(2099, 12, 31)))
+
+	coverage, err := s.BCBCoverage(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := coverage[daily]; !got.Equal(day(2026, 11, 6)) {
+		t.Errorf("série diária coberta até %s, quer 2026-11-06 (o fim da janela)", got.Format(time.DateOnly))
+	}
+	// Consulta sem datas: cobre até o dia da coleta, que foi hoje (em Brasília).
+	loc, _ := time.LoadLocation("America/Sao_Paulo")
+	y, m, d := time.Now().In(loc).Date()
+	if got := coverage[monthly]; !got.Equal(day(y, m, d)) {
+		t.Errorf("série mensal coberta até %s, quer hoje", got.Format(time.DateOnly))
+	}
+}
+
 func TestStore_RunLifecycle(t *testing.T) {
 	s, pool := newTestStore(t)
 	ctx := context.Background()

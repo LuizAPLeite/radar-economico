@@ -6,6 +6,8 @@
 //	DATABASE_URL           obrigatória
 //	COLLECTOR_SOURCES      fontes a coletar, separadas por vírgula (padrão: todas)
 //	SGS_START_DATE         início das séries diárias do BCB (padrão 2000-01-01)
+//	SGS_FULL_HISTORY       true: busca o histórico completo do BCB, mesmo já
+//	                       tendo coletado antes (padrão: só as semanas recentes)
 //	COLLECTOR_CONCURRENCY  consultas simultâneas ao BCB (padrão 4)
 //	ANP_START_MONTH        primeiro mês da ANP, AAAA-MM (padrão: 12 meses atrás)
 package main
@@ -38,11 +40,12 @@ import (
 )
 
 type config struct {
-	databaseURL string
-	sources     []string // vazio = todas
-	startDate   time.Time
-	concurrency int
-	anpStart    time.Time // zero = padrão (ver defaultANPStart)
+	databaseURL    string
+	sources        []string // vazio = todas
+	startDate      time.Time
+	sgsFullHistory bool
+	concurrency    int
+	anpStart       time.Time // zero = padrão (ver defaultANPStart)
 }
 
 // source é uma fonte de dados: o nome (gravado em raw.collection_runs.source)
@@ -103,9 +106,21 @@ func run(logger *slog.Logger) error {
 func buildSources(cfg config, logger *slog.Logger, db *store.Store, today time.Time) []source {
 	return []source{
 		{"bcb_sgs", func(ctx context.Context, runID int64) error {
-			reqs := collect.BuildRequests(collect.BCBSeries, cfg.startDate, today)
+			// Coleta incremental: cada série busca só a partir de pouco antes
+			// do que as coletas anteriores já trouxeram. Na primeira vez (ou
+			// com SGS_FULL_HISTORY), busca o histórico completo.
+			var since map[int]time.Time
+			if !cfg.sgsFullHistory {
+				coverage, err := db.BCBCoverage(ctx)
+				if err != nil {
+					return err
+				}
+				since = collect.IncrementalStarts(collect.BCBSeries, coverage, cfg.startDate)
+			}
+			reqs := collect.BuildRequests(collect.BCBSeries, since, cfg.startDate, today)
 			stats, err := collect.BCB(ctx, logger, sgs.NewClient(logger), db, runID, reqs, cfg.concurrency)
 			logger.Info("resumo do bcb_sgs", "requests", len(reqs),
+				"incremental_series", len(since), "full_history_series", len(collect.BCBSeries)-len(since),
 				"saved", stats.Saved, "empty", stats.Empty, "failed", stats.Failed)
 			return err
 		}},
@@ -221,6 +236,14 @@ func loadConfig() (config, error) {
 			return cfg, fmt.Errorf("SGS_START_DATE inválida (use AAAA-MM-DD): %w", err)
 		}
 		cfg.startDate = t
+	}
+	if v := os.Getenv("SGS_FULL_HISTORY"); v != "" {
+		// ParseBool aceita true/false, 1/0, t/f (e maiúsculas).
+		full, err := strconv.ParseBool(v)
+		if err != nil {
+			return cfg, fmt.Errorf("SGS_FULL_HISTORY inválida (use true ou false): %q", v)
+		}
+		cfg.sgsFullHistory = full
 	}
 	if v := os.Getenv("ANP_START_MONTH"); v != "" {
 		t, err := time.Parse("2006-01", v)

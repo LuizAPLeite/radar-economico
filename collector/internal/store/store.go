@@ -71,6 +71,37 @@ func (s *Store) SaveResponse(ctx context.Context, runID int64, r sgs.Response) e
 	return nil
 }
 
+// BCBCoverage devolve, para cada série do SGS, até que data as coletas
+// bem-sucedidas já buscaram: o fim da janela pedida ou, nas consultas sem
+// datas (histórico completo), o dia da coleta em Brasília. É o ponto de
+// partida da coleta incremental.
+func (s *Store) BCBCoverage(ctx context.Context) (map[int]time.Time, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT r.series_code,
+		        max(COALESCE(r.window_end, (c.started_at AT TIME ZONE 'America/Sao_Paulo')::date))
+		   FROM raw.bcb_sgs_responses AS r
+		   JOIN raw.collection_runs AS c ON c.id = r.run_id
+		  WHERE c.status = 'success'
+		  GROUP BY r.series_code`)
+	if err != nil {
+		return nil, fmt.Errorf("store: lendo a cobertura do BCB: %w", err)
+	}
+	defer rows.Close()
+
+	coverage := make(map[int]time.Time)
+	for rows.Next() {
+		var (
+			code  int
+			until time.Time
+		)
+		if err := rows.Scan(&code, &until); err != nil {
+			return nil, fmt.Errorf("store: lendo a cobertura do BCB: %w", err)
+		}
+		coverage[code] = until
+	}
+	return coverage, rows.Err()
+}
+
 // SaveIBGE grava uma resposta do IBGE, mas só se ela mudou desde a última
 // gravação do mesmo conjunto (compara o SHA-256). Devolve se gravou.
 //
