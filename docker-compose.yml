@@ -41,6 +41,7 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-radar}:${POSTGRES_PASSWORD:-radar}@postgres:5432/${POSTGRES_DB:-radar}?sslmode=disable
       SGS_START_DATE: ${SGS_START_DATE:-2000-01-01}
+      SGS_FULL_HISTORY: ${SGS_FULL_HISTORY:-}
       COLLECTOR_CONCURRENCY: ${COLLECTOR_CONCURRENCY:-4}
       COLLECTOR_SOURCES: ${COLLECTOR_SOURCES:-}
       ANP_START_MONTH: ${ANP_START_MONTH:-}
@@ -57,6 +58,7 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-radar}:${POSTGRES_PASSWORD:-radar}@postgres:5432/${POSTGRES_DB:-radar}?sslmode=disable
       PIPELINE_JOBS: ${PIPELINE_JOBS:-}
+      PIPELINE_FULL_REFRESH: ${PIPELINE_FULL_REFRESH:-}
     restart: "no"
 
   # API REST somente leitura sobre a mart. Só precisa das tabelas existirem:
