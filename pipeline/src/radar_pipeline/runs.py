@@ -94,6 +94,18 @@ def _params(job: str, started_at: datetime, finished_at: datetime, status: str) 
     }
 
 
+def last_source_run(conn: psycopg.Connection, job: str) -> int | None:
+    """A coleta mais recente que o job já processou com sucesso (None se nunca).
+
+    É o ponto de partida das cargas incrementais: o job só precisa ler o que
+    chegou ao raw depois dela.
+    """
+    return conn.execute(
+        "SELECT max(source_run_id) FROM mart.pipeline_runs WHERE job = %s AND status = 'success'",
+        (job,),
+    ).fetchone()[0]
+
+
 def describe_error(error: BaseException) -> str:
     """Tipo e mensagem do erro, cortados em MAX_ERROR_CHARS."""
     text = f"{type(error).__name__}: {error}"

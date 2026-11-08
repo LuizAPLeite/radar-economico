@@ -1,11 +1,14 @@
 """Ponto de entrada: `radar-pipeline` (ou `python -m radar_pipeline`).
 
 Variáveis de ambiente:
-    DATABASE_URL   obrigatória
-    PIPELINE_JOBS  jobs a rodar, separados por vírgula (padrão: todos, na
-                   ordem bcb, ibge, anp)
+    DATABASE_URL           obrigatória
+    PIPELINE_JOBS          jobs a rodar, separados por vírgula (padrão: todos,
+                           na ordem bcb, ibge, anp)
+    PIPELINE_FULL_REFRESH  true: reprocessa todo o raw e reconstrói staging e
+                           mart, mesmo sem nada novo (padrão: só o que chegou)
 """
 
+import functools
 import logging
 import os
 import sys
@@ -26,10 +29,20 @@ Job = Callable[[psycopg.Connection], runs.JobSummary | None]
 # A ordem importa: o job da ANP casa os municípios com a tabela que o job do
 # IBGE grava. Os jobs não se chamam: cada um lê o que precisa do banco.
 JOBS: dict[str, Job] = {
-    "bcb": bcb_job.run,
-    "ibge": ibge_job.run,
-    "anp": anp_job.run,
+    bcb_job.NAME: bcb_job.run,
+    ibge_job.NAME: ibge_job.run,
+    anp_job.NAME: anp_job.run,
 }
+
+
+def parse_flag(name: str, value: str | None) -> bool:
+    """Lê uma variável booleana: vazia, "false" ou "0" desliga; "true" ou "1" liga."""
+    normalized = (value or "").strip().lower()
+    if normalized in ("", "0", "false"):
+        return False
+    if normalized in ("1", "true"):
+        return True
+    raise ValueError(f"{name}: valor inválido {value!r} (use true ou false)")
 
 
 def select_jobs(value: str | None) -> list[str]:
@@ -92,18 +105,24 @@ def main() -> None:
         sys.exit(1)
     try:
         names = select_jobs(os.environ.get("PIPELINE_JOBS"))
+        full_refresh = parse_flag("PIPELINE_FULL_REFRESH", os.environ.get("PIPELINE_FULL_REFRESH"))
     except ValueError as e:
         log.error("%s", e)
         sys.exit(1)
+    if full_refresh:
+        log.info("carga completa: todo o raw será reprocessado")
 
     failed = []
     # autocommit: leituras fora de um job não deixam transação aberta; cada
     # job roda dentro da sua própria transação (ver run_job).
     with psycopg.connect(database_url, autocommit=True) as conn:
         for name in names:
+            # partial "fixa" um argumento: o resultado é uma função que só
+            # recebe a conexão, como run_job espera.
+            job = functools.partial(JOBS[name], full_refresh=full_refresh)
             # Um job que falha não impede os outros: a mart dele fica como
             # estava e as demais seguem atualizadas.
-            if not run_job(conn, name, JOBS[name]):
+            if not run_job(conn, name, job):
                 failed.append(name)
 
     if failed:

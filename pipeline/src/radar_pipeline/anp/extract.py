@@ -17,6 +17,15 @@ class RawFile:
     content_gzip: bytes
 
 
+def newest_run(conn: psycopg.Connection) -> int | None:
+    """A coleta mais recente que gravou algum arquivo (None se não há nenhum).
+
+    Uma versão nova de um arquivo sempre vem de uma coleta mais nova que a da
+    versão anterior, então, se este número não mudou, nenhum arquivo mudou.
+    """
+    return conn.execute("SELECT max(run_id) FROM raw.anp_files").fetchone()[0]
+
+
 def latest_files(conn: psycopg.Connection) -> list[RawFile]:
     """A versão mais recente de cada arquivo (grupo e mês). O conteúdo vem
     compactado: o job descompacta um de cada vez, para não ter os ~130 MB

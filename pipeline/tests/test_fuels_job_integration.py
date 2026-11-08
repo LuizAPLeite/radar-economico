@@ -14,6 +14,7 @@ import pytest
 
 from radar_pipeline.anp import job as anp_job
 from radar_pipeline.anp.transform import SourceFormatError
+from radar_pipeline.cli import run_job
 from radar_pipeline.ibge import job as ibge_job
 
 pytestmark = pytest.mark.skipif(
@@ -163,3 +164,33 @@ def test_invalid_anp_file_does_not_touch_the_mart(conn):
     # A mart continua com os dados da carga anterior, intactos.
     assert fetch(conn, "SELECT count(*) FROM staging.fuel_prices") == [(4,)]
     assert fetch(conn, "SELECT count(*) FROM mart.fuel_prices_weekly WHERE scope = 'BR'") == [(2,)]
+
+
+def last_status(conn, job: str) -> str:
+    return fetch(
+        conn, f"SELECT status FROM mart.pipeline_runs WHERE job = '{job}' ORDER BY id DESC LIMIT 1"
+    )[0][0]
+
+
+def test_jobs_are_skipped_until_the_raw_changes(conn):
+    conn.execute("DELETE FROM raw.anp_files")
+    insert_ibge(conn)
+    insert_anp_file(conn, VALID_ROWS)
+    assert run_job(conn, "ibge", ibge_job.run)
+    assert run_job(conn, "anp", anp_job.run)
+
+    # Sem coleta nova no raw, os dois jobs não têm o que fazer.
+    assert run_job(conn, "ibge", ibge_job.run)
+    assert run_job(conn, "anp", anp_job.run)
+    assert (last_status(conn, "ibge"), last_status(conn, "anp")) == ("skipped", "skipped")
+
+    # Um arquivo novo da ANP (o coletor só grava quando o conteúdo muda)
+    # faz o job reconstruir a mart; o do IBGE continua sem novidade.
+    insert_anp_file(conn, VALID_ROWS[2:])  # versão nova do arquivo, sem as linhas de Guarulhos/6,00
+    assert run_job(conn, "ibge", ibge_job.run)
+    assert run_job(conn, "anp", anp_job.run)
+    assert (last_status(conn, "ibge"), last_status(conn, "anp")) == ("skipped", "success")
+    assert fetch(conn, "SELECT count(*) FROM staging.fuel_prices") == [(3,)]
+
+    # A carga completa reconstrói mesmo sem novidade.
+    assert anp_job.run(conn, full_refresh=True) is not None

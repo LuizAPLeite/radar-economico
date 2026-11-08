@@ -9,9 +9,13 @@ from datetime import datetime
 import polars as pl
 import psycopg
 
+from radar_pipeline import runs
 from radar_pipeline.anp import extract, load, quality, transform
 
 log = logging.getLogger(__name__)
+
+# Nome do job no CLI e em mart.pipeline_runs.
+NAME = "anp"
 
 
 @dataclass(frozen=True)
@@ -32,11 +36,24 @@ class Summary:
         return self.weekly_rows + self.municipal_rows
 
 
-def run(conn: psycopg.Connection) -> Summary | None:
-    files = extract.latest_files(conn)
-    if not files:
+def run(conn: psycopg.Connection, *, full_refresh: bool = False) -> Summary | None:
+    """Reconstrói staging e mart dos combustíveis, se chegou arquivo novo.
+
+    Sem arquivo novo desde a última carga, termina sem fazer nada (o
+    coletor só grava um arquivo quando o conteúdo muda). Quando chega, a
+    reconstrução inteira leva poucos segundos: reprocessar só o mês que mudou
+    não compensaria a complexidade. full_refresh reconstrói mesmo sem novidade
+    (útil quando uma regra de transformação muda).
+    """
+    newest = extract.newest_run(conn)
+    if newest is None:
         log.warning("nenhum arquivo da ANP no raw; nada a processar")
         return None
+    if not full_refresh and newest <= (runs.last_source_run(conn, NAME) or 0):
+        log.info("nenhum arquivo novo da ANP desde a coleta %d; nada a processar", newest)
+        return None
+
+    files = extract.latest_files(conn)
 
     municipalities = extract.municipalities(conn)
     if municipalities.is_empty():

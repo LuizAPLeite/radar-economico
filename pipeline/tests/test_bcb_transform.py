@@ -13,10 +13,10 @@ from radar_pipeline.bcb.transform import (
 )
 
 
-def raw(*rows: tuple[int, int, object]) -> pl.DataFrame:
+def raw(*rows: tuple[int, int, object], run_id: int = 1) -> pl.DataFrame:
     """Linhas como as de raw.bcb_sgs_responses; o payload vira texto JSON."""
     return pl.DataFrame(
-        [(code, status, json.dumps(payload)) for code, status, payload in rows],
+        [(run_id, code, status, json.dumps(payload)) for code, status, payload in rows],
         schema=RAW_SCHEMA,
         orient="row",
     )
@@ -26,10 +26,10 @@ def obs(data: str, valor: str | None) -> dict[str, str | None]:
     return {"data": data, "valor": valor}
 
 
-def observations(*rows: tuple[int, str, str | None]) -> pl.DataFrame:
+def observations(*rows: tuple[int, str, str | None], run_id: int = 1) -> pl.DataFrame:
     return pl.DataFrame(
-        rows,
-        schema={"series_code": pl.Int64, "data": pl.String, "valor": pl.String},
+        [(run_id, *row) for row in rows],
+        schema={"run_id": pl.Int64, "series_code": pl.Int64, "data": pl.String, "valor": pl.String},
         orient="row",
     )
 
@@ -59,9 +59,9 @@ def test_explode_gives_one_row_per_observation_and_ignores_404():
         )
     )
     assert df.rows() == [
-        (1, "05/11/2026", "5.4621"),
-        (1, "06/11/2026", "5.5013"),
-        (433, "01/09/2026", "0.82"),
+        (1, 1, "05/11/2026", "5.4621"),
+        (1, 1, "06/11/2026", "5.5013"),
+        (1, 433, "01/09/2026", "0.82"),
     ]
 
 
@@ -78,8 +78,8 @@ def test_to_staging_types_and_sorts():
             (433, "01/08/2026", "-0.32"),
             (1, "06/11/2026", "5.5013"),
             (433, "01/07/2026", "0.07"),
+            run_id=42,
         ),
-        run_id=42,
     )
     assert result.frame.rows() == [
         (1, date(2026, 11, 6), 5.5013, 42),
@@ -97,7 +97,6 @@ def test_to_staging_drops_and_counts_observations_without_value():
             (1, "07/11/2026", "   "),
             (1, "08/11/2026", None),
         ),
-        run_id=1,
     )
     assert result.frame.height == 1
     assert result.without_value == 3
@@ -114,15 +113,30 @@ def test_to_staging_drops_and_counts_observations_without_value():
 )
 def test_to_staging_fails_loudly_on_unexpected_format(data, valor):
     with pytest.raises(pl.exceptions.PolarsError):
-        to_staging(observations((1, data, valor)), run_id=1)
+        to_staging(observations((1, data, valor)))
 
 
 def test_to_staging_rejects_duplicate_dates():
     with pytest.raises(SchemaErrors, match="uniqueness"):
-        to_staging(
-            observations((1, "06/11/2026", "5.50"), (1, "06/11/2026", "5.51")),
-            run_id=1,
+        # As duas na mesma coleta: isso não deveria acontecer.
+        to_staging(observations((1, "06/11/2026", "5.50"), (1, "06/11/2026", "5.51")))
+
+
+def test_to_staging_keeps_the_most_recent_collection_for_each_date():
+    # A coleta incremental volta 30 dias de propósito: as janelas se sobrepõem.
+    result = to_staging(
+        pl.concat(
+            [
+                observations((1, "05/11/2026", "5.4621"), (1, "06/11/2026", "5.50"), run_id=1),
+                observations((1, "06/11/2026", "5.5013"), (1, "09/11/2026", "6.20"), run_id=2),
+            ]
         )
+    )
+    assert result.frame.rows() == [
+        (1, date(2026, 11, 5), 5.4621, 1),
+        (1, date(2026, 11, 6), 5.5013, 2),  # a coleta 2 trouxe o valor corrigido
+        (1, date(2026, 11, 9), 6.2, 2),
+    ]
 
 
 # --- to_mart_values ----------------------------------------------------------

@@ -6,9 +6,13 @@ from datetime import datetime
 
 import psycopg
 
+from radar_pipeline import runs
 from radar_pipeline.ibge import extract, load, transform
 
 log = logging.getLogger(__name__)
+
+# Nome do job no CLI e em mart.pipeline_runs.
+NAME = "ibge"
 
 # O Brasil tem 5.571 municípios: bem menos que isso indica uma resposta
 # truncada ou um formato novo, e não deve substituir a tabela que já existe.
@@ -33,7 +37,16 @@ class Summary:
         return self.changed_in_mart
 
 
-def run(conn: psycopg.Connection) -> Summary | None:
+def run(conn: psycopg.Connection, *, full_refresh: bool = False) -> Summary | None:
+    """Grava os municípios, se o IBGE mudou desde a última carga (ou com full_refresh)."""
+    newest = extract.newest_run(conn)
+    if newest is None:
+        log.warning("nenhuma resposta do IBGE no raw; nada a processar")
+        return None
+    if not full_refresh and newest <= (runs.last_source_run(conn, NAME) or 0):
+        log.info("nada novo do IBGE desde a coleta %d; nada a processar", newest)
+        return None
+
     payloads = extract.latest_payloads(conn)
     missing = {"municipios", "centroides"} - payloads.keys()
     if missing:

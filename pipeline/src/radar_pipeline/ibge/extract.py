@@ -14,6 +14,15 @@ class Payload:
     data: Any  # o JSON da resposta, já como listas e dicionários do Python
 
 
+def newest_run(conn: psycopg.Connection) -> int | None:
+    """A coleta mais recente que gravou alguma resposta (None se não há nenhuma).
+
+    O coletor só grava quando o conteúdo muda: se este número não mudou,
+    nada mudou no IBGE.
+    """
+    return conn.execute("SELECT max(run_id) FROM raw.ibge_responses").fetchone()[0]
+
+
 def latest_payloads(conn: psycopg.Connection) -> dict[str, Payload]:
     """A versão mais recente de cada conjunto ("municipios", "centroides").
 
