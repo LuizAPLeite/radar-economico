@@ -42,7 +42,7 @@ docker compose up -d          # banco, migrations, coleta, pipeline, API e dashb
 docker compose exec postgres psql -U radar -c '\dn'   # deve listar raw, staging, mart
 ```
 
-Além de Postgres e Redis, o `docker compose up` sobe:
+Além do Postgres, o `docker compose up` sobe:
 
 1. **collector** (roda uma vez): coleta em paralelo o Banco Central (Selic,
    IPCA, dólar), o IBGE (municípios e coordenadas) e a ANP (preços de
@@ -170,6 +170,12 @@ curl "http://localhost:8080/v1/fuels/gasolina/prices?scope=SP&from=2026-09-01"
 Erros seguem sempre o formato `{"error": {"code": "...", "message": "..."}}`.
 A conexão com o banco é aberta em modo somente leitura
 (`default_transaction_read_only`): o Postgres recusa qualquer escrita da API.
+
+As respostas do banco ficam guardadas em memória por `CACHE_TTL` (padrão
+30 min; 1 min no Compose; `0` desliga): a mart muda no máximo uma vez por dia,
+e assim o banco não é consultado a cada visita. Séries com período são
+guardadas inteiras e recortadas em memória, então pedidos de períodos
+diferentes da mesma série saem da mesma entrada (`api/internal/cachedstore`).
 
 As queries ficam em `api/queries/` e o código Go correspondente é gerado pelo
 [sqlc](https://sqlc.dev). Depois de mudar uma query ou o schema (rodar da raiz):

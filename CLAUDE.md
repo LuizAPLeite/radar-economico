@@ -17,7 +17,7 @@ Qualidade e clareza importam mais que quantidade de features.
   grava em `staging` e `mart`. Também faz as análises (previsões, correlações).
   Usar polars de preferência.
 - **api/** – Go. API REST somente leitura sobre o schema `mart`.
-  chi (rotas), pgx + sqlc (acesso ao banco), cache no Redis, spec OpenAPI.
+  chi (rotas), pgx + sqlc (acesso ao banco), cache em memória, spec OpenAPI.
 - **web/** – Next.js + TypeScript + Tailwind. Gráficos (ECharts ou Recharts)
   e mapa (MapLibre).
 - **db/migrations/** – schemas `raw`, `staging`, `mart` no PostgreSQL.
@@ -63,7 +63,13 @@ Qualidade e clareza importam mais que quantidade de features.
   Erros sempre `{"error":{"code","message"}}`; 500 nunca expõe o erro interno.
 - `httpapi.Store` embute uma interface por recurso (`IndicatorStore`,
   `FuelStore`); nos testes, `fakeStore` embute `fakeFuelStore`.
-- Cache Redis na API fica para a Fase 3.
+- Cache em memória na API: `internal/cache` (TTL + mutex, genérico; escrito
+  pelo usuário) e `internal/cachedstore`, um decorator de `httpapi.Store`.
+  Séries guardadas inteiras por chave e recortadas por período em memória;
+  erros (inclusive "não encontrado") não entram; listas saem copiadas. Mês de
+  municípios fora de `available_months` responde vazio sem consultar o banco
+  (limita as chaves). TTL em `CACHE_TTL`: padrão e produção 30m, Compose 1m,
+  `0` desliga. Sem Redis: uma instância da API e dados que mudam uma vez por dia.
 - Web: Next.js 16 com Cache Components (ler a doc em
   `web/node_modules/next/dist/docs/` antes de mexer: a API mudou). Dados
   buscados no servidor (Server Component dentro de `<Suspense>`), sem cache
@@ -100,8 +106,8 @@ Qualidade e clareza importam mais que quantidade de features.
   parâmetro `default_transaction_read_only` que a API envia ao conectar.
   O Neon dorme após 5 min sem consultas e derruba as conexões, por isso o
   pool da API fecha conexões ociosas após 1 min.
-- Plano grátis do Neon tem 100 CU-horas/mês: antes de publicar, a API precisa
-  de cache em memória (`api/internal/cache`) para não acordar o banco a cada visita.
+- Plano grátis do Neon tem 100 CU-horas/mês: por isso a API guarda as
+  respostas em memória (ver o cache acima) e não acorda o banco a cada visita.
 
 - Collector com várias fontes (`bcb_sgs`, `ibge`, `anp`) em goroutines, cada
   uma com sua linha em `raw.collection_runs`; `COLLECTOR_SOURCES` escolhe
@@ -144,7 +150,7 @@ Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
 (raw → staging → mart). A API só lê `mart`.
 
 ## Roteiro
-- Fase 0: monorepo, Docker Compose (Postgres + Redis), migrations, CI básico.
+- Fase 0: monorepo, Docker Compose (Postgres; o Redis saiu na Fase 3), migrations, CI básico.
 - Fase 1: Banco Central (Selic, IPCA, dólar) de ponta a ponta, com deploy. ← MVP
   Concluída localmente; o deploy ficou para depois (ver "Decisões tomadas").
 - Fase 2: ANP (combustíveis) + filtros + mapa por município.
