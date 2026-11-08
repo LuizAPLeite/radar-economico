@@ -154,7 +154,7 @@ func TestListIndicatorValues_WithoutRangeUsesWholeSeries(t *testing.T) {
 	do(t, store, http.MethodGet, "/v1/indicators/usd_brl/values")
 
 	p := store.gotParams
-	if p == nil || !p.FromDate.Equal(minDate) || !p.ToDate.Equal(maxDate) {
+	if p == nil || !p.FromDate.Equal(MinDate) || !p.ToDate.Equal(MaxDate) {
 		t.Errorf("parâmetros = %+v", p)
 	}
 }

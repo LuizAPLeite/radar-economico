@@ -12,6 +12,11 @@ primary_region = "gru"
 
 [env]
   PORT = "8080"
+  # A mart muda no máximo uma vez por dia: guardar as respostas em memória
+  # por 30 min evita acordar o Neon a cada visita (o plano grátis tem cota de
+  # horas). O cache se perde quando a máquina desliga, e tudo bem: a primeira
+  # visita seguinte vai ao banco e preenche de novo.
+  CACHE_TTL = "30m"
 
 [http_service]
   internal_port = 8080

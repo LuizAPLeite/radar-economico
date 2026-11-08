@@ -164,15 +164,17 @@ func (h *handlers) internalError(w http.ResponseWriter, r *http.Request, err err
 
 // --- Parâmetros ---------------------------------------------------------------
 
-// Sem from/to, o intervalo cobre qualquer data que possa existir na mart.
+// MinDate e MaxDate cobrem qualquer data que possa existir na mart: é o
+// intervalo usado quando a requisição não tem from/to (e o que o cache usa
+// para buscar a série inteira).
 var (
-	minDate = time.Date(1900, 1, 1, 0, 0, 0, 0, time.UTC)
-	maxDate = time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
+	MinDate = time.Date(1900, 1, 1, 0, 0, 0, 0, time.UTC)
+	MaxDate = time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
 )
 
 // parseDateRange lê ?from=AAAA-MM-DD&to=AAAA-MM-DD (ambos opcionais e inclusivos).
 func parseDateRange(q url.Values) (from, to time.Time, err error) {
-	from, to = minDate, maxDate
+	from, to = MinDate, MaxDate
 	if v := q.Get("from"); v != "" {
 		if from, err = time.Parse(time.DateOnly, v); err != nil {
 			return time.Time{}, time.Time{}, fmt.Errorf("parâmetro from inválido (%q): use AAAA-MM-DD", v)

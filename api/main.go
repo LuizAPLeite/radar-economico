@@ -4,12 +4,15 @@
 //
 //	DATABASE_URL  obrigatória
 //	PORT          porta HTTP (padrão 8080)
+//	CACHE_TTL     por quanto tempo guardar em memória o que vem da mart,
+//	              como 30m ou 1h (padrão 30m; 0 desliga o cache)
 package main
 
 import (
 	"context"
 	_ "embed" // necessário para o //go:embed abaixo
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -17,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/LuizAPLeite/radar-economico/api/internal/cachedstore"
 	"github.com/LuizAPLeite/radar-economico/api/internal/db"
 	"github.com/LuizAPLeite/radar-economico/api/internal/httpapi"
 	"github.com/LuizAPLeite/radar-economico/api/internal/postgres"
@@ -42,6 +46,10 @@ func run(logger *slog.Logger) error {
 		return errors.New("DATABASE_URL não definida")
 	}
 	addr := ":" + envOr("PORT", "8080")
+	cacheTTL, err := durationEnv("CACHE_TTL", 30*time.Minute)
+	if err != nil {
+		return err
+	}
 
 	// Ctrl+C ou SIGTERM (docker stop, deploy no Fly.io) cancelam o contexto.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -53,9 +61,20 @@ func run(logger *slog.Logger) error {
 	}
 	defer pool.Close()
 
+	// Os handlers recebem um httpapi.Store: o banco direto ou o banco
+	// embrulhado pelo cache. Os dois têm os mesmos métodos, então o resto do
+	// código não muda.
+	var store httpapi.Store = db.New(pool)
+	if cacheTTL > 0 {
+		store = cachedstore.New(store, cacheTTL)
+		logger.Info("cache em memória ligado", "ttl", cacheTTL.String())
+	} else {
+		logger.Info("cache em memória desligado (CACHE_TTL=0)")
+	}
+
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: httpapi.NewRouter(db.New(pool), logger, openAPISpec),
+		Handler: httpapi.NewRouter(store, logger, openAPISpec),
 		// Timeouts explícitos: o http.Server padrão não tem nenhum,
 		// o que deixa conexões lentas presas para sempre.
 		ReadHeaderTimeout: 5 * time.Second,
@@ -96,4 +115,17 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// durationEnv lê uma duração no formato do time.ParseDuration ("30m", "1h30m", "0").
+func durationEnv(key string, fallback time.Duration) (time.Duration, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback, nil
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d < 0 {
+		return 0, fmt.Errorf("%s inválida (%q): use uma duração como 30m ou 1h, ou 0 para desligar", key, v)
+	}
+	return d, nil
 }

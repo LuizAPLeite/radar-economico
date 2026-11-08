@@ -88,7 +88,7 @@ func TestListFuelPrices(t *testing.T) {
 		`{"week_start":"2026-10-19","avg_price":6.29,"n_stations":912},`+
 		`{"week_start":"2026-10-26","avg_price":6.27,"n_stations":900}]}`)
 	p := store.gotWeekly
-	if p == nil || p.ProductID != "gasolina" || p.Scope != "SP" || !p.FromDate.Equal(d(2026, 10, 1)) || !p.ToDate.Equal(maxDate) {
+	if p == nil || p.ProductID != "gasolina" || p.Scope != "SP" || !p.FromDate.Equal(d(2026, 10, 1)) || !p.ToDate.Equal(MaxDate) {
 		t.Errorf("parâmetros = %+v", p)
 	}
 }
@@ -170,6 +170,18 @@ func TestListFuelMunicipalities_ExplicitMonth(t *testing.T) {
 	}
 	if p := store.gotMonthly; p == nil || !p.Month.Equal(d(2026, 9, 1)) {
 		t.Errorf("parâmetros = %+v", p)
+	}
+}
+
+func TestListFuelMunicipalities_MonthWithoutData(t *testing.T) {
+	store := fuelStore(fakeFuelStore{fuel: gasolina, months: monthsSepOct})
+	rec := do(t, store, http.MethodGet, "/v1/fuels/gasolina/municipalities?month=2025-01")
+
+	assertJSON(t, rec, http.StatusOK, `{"fuel":`+gasolinaJSON+`},"month":"2025-01",`+
+		`"available_months":["2026-09","2026-10"],"data":[]}`)
+	// Mês fora da lista: a resposta sai sem consultar o banco.
+	if store.gotMonthly != nil {
+		t.Errorf("consultou o banco com %+v", store.gotMonthly)
 	}
 }
 

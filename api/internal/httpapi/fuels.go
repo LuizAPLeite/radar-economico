@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -173,6 +174,14 @@ func (h *handlers) listFuelMunicipalities(w http.ResponseWriter, r *http.Request
 	}
 	shown := month.Format(monthLayout)
 	resp.Month = &shown
+
+	// Mês fora da lista: já se sabe que não há dados, sem consultar o banco.
+	// Isso também limita o cache a uma entrada por mês que existe, e não uma
+	// por mês qualquer que alguém escreva na URL.
+	if !slices.ContainsFunc(months, month.Equal) {
+		writeJSON(w, http.StatusOK, resp)
+		return
+	}
 
 	rows, err := h.store.ListFuelPricesMunicipal(r.Context(), db.ListFuelPricesMunicipalParams{
 		ProductID: id, Month: month,
