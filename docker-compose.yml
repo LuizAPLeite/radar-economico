@@ -17,16 +17,6 @@ services:
       timeout: 3s
       retries: 10
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   # Aplica as migrations e encerra. Roda de novo a cada `docker compose up`
   # (é idempotente: o golang-migrate só aplica o que ainda não foi aplicado).
   migrate:
@@ -79,6 +69,9 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-radar}:${POSTGRES_PASSWORD:-radar}@postgres:5432/${POSTGRES_DB:-radar}?sslmode=disable
       PORT: "8080"
+      # Cache curto no desenvolvimento: o que o pipeline grava aparece em até
+      # 1 minuto. Em produção vale 30m (api/fly.toml).
+      CACHE_TTL: ${CACHE_TTL:-1m}
     ports:
       - "${API_PORT:-8080}:8080"
     restart: unless-stopped
