@@ -89,8 +89,8 @@ func NewClient(logger *slog.Logger) *Client {
 	}
 }
 
-// Fetch consulta uma série. Falhas temporárias (rede, timeout, 429, 5xx,
-// corpo que não é JSON) são repetidas com backoff exponencial; erros do
+// Fetch consulta uma série. Falhas temporárias (rede, timeout, 304, 429,
+// 5xx, corpo que não é JSON) são repetidas com backoff exponencial; erros do
 // cliente (4xx) não, porque repetir não muda o resultado.
 func (c *Client) Fetch(ctx context.Context, req Request) (Response, error) {
 	u := c.buildURL(req)
@@ -157,7 +157,11 @@ func (c *Client) do(ctx context.Context, req Request, u string) (resp Response, 
 	case httpResp.StatusCode == http.StatusNotFound && isNoValues(body):
 		return result, false, nil
 
-	case httpResp.StatusCode == http.StatusTooManyRequests || httpResp.StatusCode >= 500:
+	case httpResp.StatusCode == http.StatusTooManyRequests || httpResp.StatusCode >= 500,
+		// 304 (Not Modified) só faz sentido quando o cliente manda cabeçalhos
+		// de cache condicional, e este não manda nenhum. Mesmo assim o SGS já
+		// respondeu 304 (nov/2026): é um defeito passageiro do servidor.
+		httpResp.StatusCode == http.StatusNotModified:
 		return Response{}, true, &StatusError{StatusCode: httpResp.StatusCode, Body: snippet(body)}
 
 	default:

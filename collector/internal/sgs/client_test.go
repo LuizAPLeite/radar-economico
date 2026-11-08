@@ -146,6 +146,13 @@ func TestFetch_StatusHandling(t *testing.T) {
 			wantCalls: 2,
 		},
 		{
+			// Visto em nov/2026: o SGS respondeu 304 a uma consulta sem
+			// cabeçalhos de cache, e a coleta inteira falhou.
+			name:      "304 sem ter pedido cache repete e funciona",
+			replies:   []reply{{304, ``}, {200, okBody}},
+			wantCalls: 2,
+		},
+		{
 			name:      "200 com HTML repete",
 			replies:   []reply{{200, `<html>manutenção</html>`}, {200, okBody}},
 			wantCalls: 2,
