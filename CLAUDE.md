@@ -40,13 +40,26 @@ Qualidade e clareza importam mais que quantidade de features.
 - Collector: séries diárias em janelas de até 10 anos desde `SGS_START_DATE`;
   4 consultas simultâneas (`errgroup.SetLimit`); uma falha não interrompe as
   demais. Imagem distroless.
+- Coleta do BCB incremental: cada série volta 30 dias (IPCA, mensal: 120)
+  antes de até onde as coletas bem-sucedidas já foram (`store.BCBCoverage`:
+  fim da janela, ou o dia da coleta nas consultas sem datas). A primeira
+  coleta, ou `SGS_FULL_HISTORY=true`, traz o histórico completo. A API SGS
+  aceita período também no IPCA e responde 404 em período vazio.
 - Testes de integração Go usam `TEST_DATABASE_URL` e são pulados sem ela;
   no CI o job Go sobe um Postgres e aplica as migrations antes.
-- Pipeline BCB: staging e mart são reconstruídas a cada execução a partir da
-  coleta bem-sucedida mais recente (que traz o histórico completo), com
-  DELETE + COPY + ANALYZE numa transação. Cargas incrementais: Fase 3.
+- Pipeline BCB incremental: processa as coletas bem-sucedidas depois da
+  última já processada (`runs.last_source_run`: maior `source_run_id` com
+  sucesso em `mart.pipeline_runs`); entre coletas, vale a mais recente para
+  cada data; grava com upsert (`pg.upsert_frame`: COPY para tabela temporária
+  + INSERT ... ON CONFLICT DO UPDATE ... WHERE IS DISTINCT FROM), sem apagar
+  nada. `PIPELINE_FULL_REFRESH=true` relê todo o raw e reconstrói com
+  DELETE + COPY + ANALYZE.
+- ANP e IBGE: o job termina como skipped se o maior `run_id` do raw não
+  passou do último processado; com novidade, reconstrói tudo (poucos
+  segundos; reprocessar só o mês que mudou não compensa).
 - Validação pandera ANTES de gravar: contrato violado = job falha e a mart
-  fica intacta. Datas repetidas falham (não são deduplicadas em silêncio).
+  fica intacta. Datas repetidas na mesma coleta falham (não são deduplicadas
+  em silêncio).
 - mart: `mart.indicators` (ids `selic`, `ipca`, `usd_brl`, com limites de
   sanidade em `pipeline/.../bcb/indicators.py`) e `mart.indicator_values`
   (numeric). Datas após o dia da coleta (horário de Brasília) não entram.

@@ -47,16 +47,25 @@ Além do Postgres, o `docker compose up` sobe:
 1. **collector** (roda uma vez): coleta em paralelo o Banco Central (Selic,
    IPCA, dólar), o IBGE (municípios e coordenadas) e a ANP (preços de
    combustíveis por posto, últimos 12 meses) e grava tudo, intacto, no schema
-   `raw`. A primeira coleta da ANP leva alguns minutos: o servidor é lento;
-   as seguintes só baixam o que mudou;
+   `raw`. As coletas são **incrementais**: a primeira traz o histórico (o BCB
+   desde 2000; a primeira da ANP leva alguns minutos, porque o servidor é
+   lento), e as seguintes só buscam o que pode ter mudado. No BCB, isso são
+   as últimas semanas de cada série, com uma margem para valores publicados
+   com atraso ou corrigidos: ~3 KB por coleta, em vez de ~100 KB;
 2. **pipeline** (roda uma vez, depois do collector): três jobs, cada um lendo
-   o `raw`, validando com pandera e gravando `staging` e `mart`:
-   - **bcb**: indicadores (`mart.indicator_values`);
+   do `raw` só o que chegou desde a última execução, validando com pandera e
+   gravando `staging` e `mart`:
+   - **bcb**: indicadores (`mart.indicator_values`). Junta as coletas novas e
+     grava com upsert (insere as datas novas, atualiza os valores corrigidos
+     e não apaga nada);
    - **ibge**: municípios com coordenadas (`mart.municipalities`);
    - **anp**: ~780 mil preços por posto (`staging.fuel_prices`), casados com os
      municípios do IBGE, e as médias semanais por UF e Brasil
      (`mart.fuel_prices_weekly`) e mensais por município
-     (`mart.fuel_prices_municipal`). Leva uns 7 segundos.
+     (`mart.fuel_prices_municipal`). Reconstrói tudo em uns 5 segundos quando
+     chega arquivo novo.
+
+   Sem nada novo no `raw`, o job termina na hora, sem tocar na mart.
 
    Cada execução de cada job fica registrada em `mart.pipeline_runs`: se deu
    certo, falhou ou não tinha nada novo, de qual coleta vieram os dados e
@@ -82,6 +91,15 @@ docker compose up collector pipeline
 docker compose run --rm --no-deps -e COLLECTOR_SOURCES=ibge collector
 docker compose run --rm --no-deps pipeline
 docker compose run --rm --no-deps -e PIPELINE_JOBS=anp pipeline
+```
+
+Para buscar o histórico completo do BCB de novo, ou reconstruir staging e
+mart do zero a partir de todo o raw (depois de mudar uma regra de
+transformação, por exemplo):
+
+```bash
+docker compose run --rm --no-deps -e COLLECTOR_SOURCES=bcb_sgs -e SGS_FULL_HISTORY=true collector
+docker compose run --rm --no-deps -e PIPELINE_FULL_REFRESH=true pipeline
 ```
 
 Para ver os dados prontos:
