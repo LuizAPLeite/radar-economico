@@ -61,7 +61,16 @@ Além do Postgres, o `docker compose up` sobe:
    Cada execução de cada job fica registrada em `mart.pipeline_runs`: se deu
    certo, falhou ou não tinha nada novo, de qual coleta vieram os dados e
    quantas linhas foram gravadas. A carga e o registro do sucesso vão na
-   mesma transação; se o job falha, a carga é desfeita e a falha é registrada;
+   mesma transação; se o job falha, a carga é desfeita e a falha é registrada.
+
+   A validação tem dois níveis. O **contrato** (pandera) barra o que está
+   claramente errado, e o job falha sem tocar na mart. Os **avisos** marcam o
+   que pode ser erro, mas também pode ser real, e ficam no registro sem
+   impedir a carga: um salto grande nos valores novos (o dólar acima de 10%
+   num dia; a média nacional de um combustível acima de 15% numa semana), um
+   mês da ANP com bem menos preços que o normal, uma semana com UFs faltando.
+   Os limites foram calibrados com os dados reais, para não avisar sobre o
+   que é normal;
 3. **api** (fica no ar): serve a mart em http://localhost:8080;
 4. **web** (fica no ar): o dashboard em **http://localhost:3000**.
 

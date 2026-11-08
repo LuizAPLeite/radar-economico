@@ -141,6 +141,15 @@ Qualidade e clareza importam mais que quantidade de features.
   gravadas, avisos). Carga e registro do sucesso na mesma transação (a do job
   vira SAVEPOINT); a falha é registrada depois do rollback. A mensagem de
   erro fica só no banco: a API não a expõe.
+- Validação em dois níveis: contrato pandera (falha o job, mart intacta) e
+  avisos de qualidade (`bcb/quality.py`, `anp/quality.py`, IBGE no job), que
+  não impedem a carga e vão para `pipeline_runs.warnings`. Avisos só olham o
+  que é NOVO na carga (valores/semanas depois do último que a mart tinha;
+  primeira carga não checa), para não repetir o histórico. Limites
+  calibrados nos dados reais: dólar 10%/dia, Selic e IPCA 2 p.p. (no
+  catálogo `indicators.py`), média semanal 15%, mês < 70% da mediana do
+  produto, UFs < mediana do produto − 2, mais de 10 municípios sem
+  coordenadas. Mensagens em português, com números no padrão brasileiro.
 - Média semanal: semana começa na segunda; semanas com menos de 50% da
   mediana de postos do produto (ex.: bordas de um mês que a ANP não
   publicou) saem do Brasil e de todas as UFs.
