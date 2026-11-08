@@ -183,6 +183,7 @@ fica em [`api/openapi.yaml`](api/openapi.yaml) e é servida em `/openapi.yaml`.
 | Rota | O que devolve |
 |---|---|
 | `GET /health` | `{"status":"ok"}` |
+| `GET /health/data` | Se os dados estão em dia: a data mais recente de cada conjunto, a última execução de cada job e os avisos de qualidade. 200 ou 503 |
 | `GET /v1/indicators` | Indicadores (`selic`, `ipca`, `usd_brl`) com o valor mais recente |
 | `GET /v1/indicators/{id}/values?from=AAAA-MM-DD&to=AAAA-MM-DD` | Série histórica; `from` e `to` são opcionais |
 | `GET /v1/fuels` | Combustíveis (`gasolina`, `etanol`, `diesel_s10`...) com a média nacional da última semana |
@@ -197,6 +198,17 @@ curl "http://localhost:8080/v1/fuels/gasolina/prices?scope=SP&from=2026-09-01"
 Erros seguem sempre o formato `{"error": {"code": "...", "message": "..."}}`.
 A conexão com o banco é aberta em modo somente leitura
 (`default_transaction_read_only`): o Postgres recusa qualquer escrita da API.
+
+O `GET /health/data` compara a data do dado mais recente de cada conjunto com
+o ritmo da fonte: até 5 dias para a Selic e o dólar (fins de semana e
+feriados), 75 para o IPCA (que sai por volta do dia 10 do mês seguinte) e 60
+para a ANP (arquivos mensais, publicados semanas depois). Responde 503 quando
+algo atrasou ou quando a última execução de um job falhou, para um monitor
+externo avisar; a mensagem de erro do job fica só no banco.
+
+```bash
+curl -s http://localhost:8080/health/data
+```
 
 As respostas do banco ficam guardadas em memória por `CACHE_TTL` (padrão
 30 min; 1 min no Compose; `0` desliga): a mart muda no máximo uma vez por dia,

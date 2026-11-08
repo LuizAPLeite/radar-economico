@@ -44,7 +44,9 @@ Qualidade e clareza importam mais que quantidade de features.
   antes de até onde as coletas bem-sucedidas já foram (`store.BCBCoverage`:
   fim da janela, ou o dia da coleta nas consultas sem datas). A primeira
   coleta, ou `SGS_FULL_HISTORY=true`, traz o histórico completo. A API SGS
-  aceita período também no IPCA e responde 404 em período vazio.
+  aceita período também no IPCA e responde 404 em período vazio. Às vezes
+  responde 304 sem o cliente pedir cache (nov/2026): o cliente repete, como
+  num 5xx.
 - Testes de integração Go usam `TEST_DATABASE_URL` e são pulados sem ela;
   no CI o job Go sobe um Postgres e aplica as migrations antes.
 - Pipeline BCB incremental: processa as coletas bem-sucedidas depois da
@@ -69,13 +71,21 @@ Qualidade e clareza importam mais que quantidade de features.
   `api/internal/db` com sqlc via Docker (`sqlc/sqlc:1.31.1`); CI roda
   `sqlc diff`. numeric → float64 na API; datas como `AAAA-MM-DD`.
 - API conecta com `default_transaction_read_only=on`: o Postgres recusa escrita.
-- Rotas: `/health`, `/v1/indicators`, `/v1/indicators/{id}/values?from&to`,
+- Rotas: `/health`, `/health/data`, `/v1/indicators`,
+  `/v1/indicators/{id}/values?from&to`,
   `/v1/fuels`, `/v1/fuels/{id}/prices?scope&from&to` (scope `BR` ou UF),
   `/v1/fuels/{id}/municipalities?month=AAAA-MM` (padrão: mês mais recente;
   traz `available_months`), `/openapi.yaml` (spec embutida com go:embed).
   Erros sempre `{"error":{"code","message"}}`; 500 nunca expõe o erro interno.
+- `/health/data`: idade do dado mais recente de cada conjunto (selic, usd_brl,
+  ipca, fuels) contra o prazo da fonte (5, 5, 75 e 60 dias, no horário de
+  Brasília; tzdata embutido), última execução de cada job e avisos da última
+  carga (que um skipped não esconde). 200 se tudo em dia; 503 se algo
+  atrasou, está vazio ou o último job falhou. Leituras pelo cache;
+  `Cache-Control: no-store`; a mensagem de erro do job não sai.
 - `httpapi.Store` embute uma interface por recurso (`IndicatorStore`,
-  `FuelStore`); nos testes, `fakeStore` embute `fakeFuelStore`.
+  `FuelStore`, `HealthStore`); nos testes, `fakeStore` embute
+  `fakeFuelStore` e `fakeHealthStore`.
 - Cache em memória na API: `internal/cache` (TTL + mutex, genérico; escrito
   pelo usuário) e `internal/cachedstore`, um decorator de `httpapi.Store`.
   Séries guardadas inteiras por chave e recortadas por período em memória;
