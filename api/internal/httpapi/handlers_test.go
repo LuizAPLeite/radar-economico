@@ -22,6 +22,7 @@ import (
 // fuels_test.go): os métodos de combustíveis vêm "de graça" com o campo.
 type fakeStore struct {
 	fakeFuelStore
+	fakeHealthStore
 
 	indicators []db.ListIndicatorsRow
 	listErr    error

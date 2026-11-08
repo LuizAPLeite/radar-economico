@@ -24,6 +24,7 @@ import (
 type Store interface {
 	IndicatorStore
 	FuelStore
+	HealthStore
 }
 
 // IndicatorStore é o que os handlers de indicadores precisam do banco.

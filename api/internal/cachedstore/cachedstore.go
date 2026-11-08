@@ -36,6 +36,9 @@ type Store struct {
 	weekly     *cache.Cache[[]db.ListFuelPricesWeeklyRow]
 	months     *cache.Cache[[]time.Time]
 	municipal  *cache.Cache[[]db.ListFuelPricesMunicipalRow]
+	freshness  *cache.Cache[[]db.ListDatasetFreshnessRow]
+	lastRuns   *cache.Cache[[]db.ListLastRunsRow]
+	lastOK     *cache.Cache[[]db.ListLastSuccessfulRunsRow]
 }
 
 // Conferência em tempo de compilação: se Store deixar de implementar
@@ -55,6 +58,9 @@ func New(next httpapi.Store, ttl time.Duration) *Store {
 		weekly:     cache.New[[]db.ListFuelPricesWeeklyRow](ttl),
 		months:     cache.New[[]time.Time](ttl),
 		municipal:  cache.New[[]db.ListFuelPricesMunicipalRow](ttl),
+		freshness:  cache.New[[]db.ListDatasetFreshnessRow](ttl),
+		lastRuns:   cache.New[[]db.ListLastRunsRow](ttl),
+		lastOK:     cache.New[[]db.ListLastSuccessfulRunsRow](ttl),
 	}
 }
 
@@ -121,6 +127,31 @@ func (s *Store) ListFuelPricesMunicipal(ctx context.Context, arg db.ListFuelPric
 	key := arg.ProductID + "|" + arg.Month.Format("2006-01")
 	return cachedRows(s.municipal, key, func() ([]db.ListFuelPricesMunicipalRow, error) {
 		return s.next.ListFuelPricesMunicipal(ctx, arg)
+	})
+}
+
+// --- Saúde dos dados ------------------------------------------------------------
+//
+// Também passam pelo cache: um monitor consultando /health/data a cada poucos
+// minutos não pode manter o banco acordado (o Neon cobra o tempo ligado). O
+// "agora" é calculado a cada requisição, então a idade dos dados é sempre a
+// atual; só a leitura do banco pode ter até um TTL.
+
+func (s *Store) ListDatasetFreshness(ctx context.Context) ([]db.ListDatasetFreshnessRow, error) {
+	return cachedRows(s.freshness, "", func() ([]db.ListDatasetFreshnessRow, error) {
+		return s.next.ListDatasetFreshness(ctx)
+	})
+}
+
+func (s *Store) ListLastRuns(ctx context.Context) ([]db.ListLastRunsRow, error) {
+	return cachedRows(s.lastRuns, "", func() ([]db.ListLastRunsRow, error) {
+		return s.next.ListLastRuns(ctx)
+	})
+}
+
+func (s *Store) ListLastSuccessfulRuns(ctx context.Context) ([]db.ListLastSuccessfulRunsRow, error) {
+	return cachedRows(s.lastOK, "", func() ([]db.ListLastSuccessfulRunsRow, error) {
+		return s.next.ListLastSuccessfulRuns(ctx)
 	})
 }
 

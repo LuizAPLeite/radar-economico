@@ -30,6 +30,37 @@ paths:
                     type: string
                     const: ok
 
+  /health/data:
+    get:
+      operationId: healthData
+      summary: Verifica se os dados estão em dia
+      description: |
+        Para cada conjunto de dados, a data do dado mais recente e se ela está
+        dentro do prazo esperado para a fonte (que considera fins de semana,
+        feriados e o atraso de publicação). Também traz a última execução de
+        cada job do pipeline e os avisos de qualidade da última carga.
+
+        Responde 200 quando está tudo em dia, e 503 quando algum conjunto
+        atrasou ou está vazio, ou quando a última execução de algum job falhou,
+        para servir a um monitor externo. O corpo é o mesmo nos dois casos.
+        A leitura do banco passa pelo cache da API (CACHE_TTL), mas a idade dos
+        dados é calculada a cada requisição.
+      responses:
+        "200":
+          description: Todos os dados em dia
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReport"
+        "503":
+          description: Algum conjunto atrasado ou vazio, ou um job com falha
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReport"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /v1/indicators:
     get:
       operationId: listIndicators
@@ -389,6 +420,77 @@ components:
         n_stations:
           type: integer
           description: Postos pesquisados no mês
+
+    HealthReport:
+      type: object
+      required: [status, checked_at, datasets, jobs]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        checked_at:
+          type: string
+          format: date-time
+        datasets:
+          type: array
+          items:
+            $ref: "#/components/schemas/DatasetHealth"
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/JobHealth"
+
+    DatasetHealth:
+      type: object
+      required: [id, name, latest, age_days, max_age_days, status]
+      properties:
+        id:
+          type: string
+          enum: [selic, usd_brl, ipca, fuels]
+        name:
+          type: string
+          examples: [Meta Selic]
+        latest:
+          type: [string, "null"]
+          format: date
+          description: Data do dado mais recente; null quando não há dados
+        age_days:
+          type: [integer, "null"]
+          description: Dias desde o dado mais recente, no horário de Brasília
+        max_age_days:
+          type: integer
+          description: Prazo da fonte; acima dele, o conjunto está atrasado
+        status:
+          type: string
+          enum: [ok, stale, missing]
+
+    JobHealth:
+      type: object
+      required: [job, last_status, last_run_at, last_success_at, collected_at, warnings]
+      properties:
+        job:
+          type: string
+          examples: [anp]
+        last_status:
+          type: string
+          enum: [success, skipped, failed]
+          description: Resultado da última execução (skipped = nada novo no raw)
+        last_run_at:
+          type: string
+          format: date-time
+        last_success_at:
+          type: [string, "null"]
+          format: date-time
+          description: Fim da última carga que deu certo; null se nunca deu
+        collected_at:
+          type: [string, "null"]
+          format: date-time
+          description: Quando a fonte usada na última carga foi coletada
+        warnings:
+          type: array
+          items:
+            type: string
+          description: Avisos de qualidade da última carga (não impediram a carga)
 
     Error:
       type: object

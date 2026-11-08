@@ -91,6 +91,21 @@ func (f *countingStore) ListFuelPricesMunicipal(_ context.Context, p db.ListFuel
 	return []db.ListFuelPricesMunicipalRow{{Name: "Barreiras", AvgPrice: 6.89}}, nil
 }
 
+func (f *countingStore) ListDatasetFreshness(context.Context) ([]db.ListDatasetFreshnessRow, error) {
+	f.count("ListDatasetFreshness")
+	return []db.ListDatasetFreshnessRow{{Dataset: "selic", Latest: day(2026, 11, 8)}}, nil
+}
+
+func (f *countingStore) ListLastRuns(context.Context) ([]db.ListLastRunsRow, error) {
+	f.count("ListLastRuns")
+	return nil, nil
+}
+
+func (f *countingStore) ListLastSuccessfulRuns(context.Context) ([]db.ListLastSuccessfulRunsRow, error) {
+	f.count("ListLastSuccessfulRuns")
+	return nil, nil
+}
+
 func day(y int, m time.Month, d int) time.Time { return time.Date(y, m, d, 0, 0, 0, 0, time.UTC) }
 
 var ctx = context.Background()
@@ -109,9 +124,12 @@ func TestRepeatedCallsGoToTheStoreOnce(t *testing.T) {
 		if _, err := s.ListFuelMonths(ctx, "gasolina"); err != nil {
 			t.Fatal(err)
 		}
+		if _, err := s.ListDatasetFreshness(ctx); err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	for _, method := range []string{"ListIndicators", "GetFuelProduct", "ListFuelMonths"} {
+	for _, method := range []string{"ListIndicators", "GetFuelProduct", "ListFuelMonths", "ListDatasetFreshness"} {
 		if n := inner.callsTo(method); n != 1 {
 			t.Errorf("%s chamado %d vezes, quer 1", method, n)
 		}

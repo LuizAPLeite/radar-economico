@@ -32,6 +32,7 @@ func NewRouter(store Store, logger *slog.Logger, openAPISpec []byte) http.Handle
 	})
 
 	r.Get("/health", h.health)
+	r.Get("/health/data", h.healthData)
 	r.Get("/openapi.yaml", serveSpec(openAPISpec))
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/indicators", h.listIndicators)
