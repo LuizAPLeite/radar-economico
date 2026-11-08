@@ -126,6 +126,15 @@ Qualidade e clareza importam mais que quantidade de features.
   `MUNICIPALITY_EXCEPTIONS` (`anp/transform.py`). Cópias idênticas (mesmo
   posto, produto, dia e preço) são removidas; preços diferentes no mesmo
   dia falham.
+- Fase 3, plano aprovado (nov/2026): cache só em memória (o Redis sai do
+  Compose); coleta agendada no `data.yml` desligada por variável até o deploy,
+  mais um canário diário no CI (fontes reais num Postgres temporário);
+  testes de contrato da API contra a `openapi.yaml` com kin-openapi.
+- Cada execução de job vira uma linha em `mart.pipeline_runs` (success,
+  skipped quando não há nada no raw, failed; coleta de origem, linhas
+  gravadas, avisos). Carga e registro do sucesso na mesma transação (a do job
+  vira SAVEPOINT); a falha é registrada depois do rollback. A mensagem de
+  erro fica só no banco: a API não a expõe.
 - Média semanal: semana começa na segunda; semanas com menos de 50% da
   mediana de postos do produto (ex.: bordas de um mês que a ANP não
   publicou) saem do Brasil e de todas as UFs.
@@ -141,7 +150,7 @@ Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
 - Fase 2: ANP (combustíveis) + filtros + mapa por município.
   Concluída localmente.
 - Fase 3: cargas incrementais, testes, validação de dados, cache, coleta agendada,
-  endpoint de saúde dos dados.
+  endpoint de saúde dos dados. ← atual
 - Fase 4: análises (previsão de preços, correlação dólar × gasolina).
 - Fase 5: assistente com LLM (pergunta em português → SQL → resposta + gráfico).
 - Fase 6: README caprichado, diagrama, GIF de demo.

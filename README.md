@@ -6,7 +6,9 @@ camadas e exibe num dashboard web com gráficos e mapa.
 > **Fases 1 e 2 concluídas:** Selic, IPCA e dólar do Banco Central, e os
 > preços de combustíveis da ANP com mapa por município, de ponta a ponta,
 > rodando localmente com `docker compose up` (o deploy está configurado, mas
-> ainda não publicado).
+> ainda não publicado). **Em andamento:** Fase 3, a operação dos dados:
+> registro das execuções, cache, cargas incrementais, saúde dos dados e
+> coleta agendada.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/combustiveis-escuro.png">
@@ -54,7 +56,12 @@ Além de Postgres e Redis, o `docker compose up` sobe:
    - **anp**: ~780 mil preços por posto (`staging.fuel_prices`), casados com os
      municípios do IBGE, e as médias semanais por UF e Brasil
      (`mart.fuel_prices_weekly`) e mensais por município
-     (`mart.fuel_prices_municipal`). Leva uns 7 segundos;
+     (`mart.fuel_prices_municipal`). Leva uns 7 segundos.
+
+   Cada execução de cada job fica registrada em `mart.pipeline_runs`: se deu
+   certo, falhou ou não tinha nada novo, de qual coleta vieram os dados e
+   quantas linhas foram gravadas. A carga e o registro do sucesso vão na
+   mesma transação; se o job falha, a carga é desfeita e a falha é registrada;
 3. **api** (fica no ar): serve a mart em http://localhost:8080;
 4. **web** (fica no ar): o dashboard em **http://localhost:3000**.
 
@@ -73,6 +80,7 @@ Para ver os dados prontos:
 ```bash
 docker compose exec postgres psql -U radar -c "SELECT * FROM mart.indicators"
 docker compose exec postgres psql -U radar -c "SELECT * FROM mart.fuel_prices_weekly WHERE scope = 'BR' ORDER BY week_start DESC LIMIT 6"
+docker compose exec postgres psql -U radar -c "SELECT job, status, finished_at, rows_written FROM mart.pipeline_runs ORDER BY id DESC LIMIT 6"
 ```
 
 Cada componente:
