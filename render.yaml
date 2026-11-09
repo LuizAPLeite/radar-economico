@@ -1,0 +1,28 @@
+# Deploy da API no Render (Blueprint: https://render.com/docs/blueprint-spec).
+# No painel do Render: New → Blueprint → este repositório. Ele pede só o
+# valor de DATABASE_URL (a connection string DIRETA do Neon, sem -pooler).
+#
+# Plano Free: sem cartão e sem custo. O serviço dorme após 15 min sem
+# requisições e leva ~1 min para acordar; o workflow keepalive.yml consulta
+# /health a cada 10 min para ele não dormir (750 h grátis por mês cobrem o
+# mês inteiro). O /health não consulta o banco: o Neon continua dormindo.
+services:
+  - type: web
+    name: radar-economico-api
+    runtime: docker
+    plan: free
+    # A região mais próxima do Brasil entre as do Render.
+    region: virginia
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: ./api
+    healthCheckPath: /health
+    # Publica de novo a cada push na main que mexa na API.
+    autoDeploy: true
+    buildFilter:
+      paths:
+        - api/**
+    envVars:
+      - key: DATABASE_URL
+        sync: false # segredo: informado no painel, nunca no repositório
+      - key: CACHE_TTL
+        value: 30m

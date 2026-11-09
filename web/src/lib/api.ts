@@ -34,9 +34,10 @@ function apiUrl(): string {
   return process.env.API_URL ?? "http://localhost:8080";
 }
 
-// Em produção, a API (Fly.io) e o banco (Neon) desligam quando ficam sem uso;
-// a primeira requisição depois disso leva alguns segundos para acordar os dois.
-const TIMEOUT_MS = 10_000;
+// Em produção, a API (Render Free) e o banco (Neon) desligam quando ficam sem
+// uso. A API é mantida acordada (workflow keepalive.yml), mas, se o
+// agendamento atrasar, ela leva ~1 min para religar: a espera cobre isso.
+const TIMEOUT_MS = 70_000;
 
 async function getJSON<T>(path: string): Promise<T> {
   const res = await fetch(apiUrl() + path, { signal: AbortSignal.timeout(TIMEOUT_MS) });
