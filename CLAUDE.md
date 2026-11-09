@@ -128,7 +128,18 @@ Qualidade e clareza importam mais que quantidade de features.
   preços na hora, ou considerar um host gratuito para a API.
 - Deploy planejado (tudo em São Paulo): Neon Free (Postgres 16, `sa-east-1`),
   API no Fly.io (`gru`, auto-stop, menor máquina), web na Vercel Hobby (`gru1`,
-  raiz `web`). Coleta em produção pelo workflow manual `data.yml`.
+  raiz `web`). Coleta em produção pelo `data.yml`: diária às 9h de Brasília,
+  só com a variável do repositório `COLETA_AGENDADA=true` (ligar no deploy),
+  ou manual; o pipeline roda mesmo se uma fonte falhar. Coleta só BCB e ANP.
+- O IBGE recusa conexões vindas de fora do Brasil (o Actions roda nos EUA:
+  dial tcp timeout). Municípios em produção: carregar a partir de uma máquina
+  no Brasil (comando no README, Deploy); mudam quase nunca.
+- Canário `fontes.yml`: diário às 7h30, também roda quando o próprio arquivo
+  muda. Postgres temporário, coleta real de BCB e ANP (só 2 meses), municípios
+  do retrato `.github/canario/municipios.csv.gz` (comando para regerar no
+  workflow), pipeline `bcb,anp` e API com `CACHE_TTL=0`; falha se
+  `/health/data` não der 200. Erros do coletor viram anotações; o JSON da
+  saúde vai para o resumo. Não cobre mudanças de formato do IBGE.
 - Neon: usar a connection string DIRETA (sem `-pooler`): o pooler recusa o
   parâmetro `default_transaction_read_only` que a API envia ao conectar.
   O Neon dorme após 5 min sem consultas e derruba as conexões, por isso o
@@ -192,7 +203,7 @@ Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
 - Fase 2: ANP (combustíveis) + filtros + mapa por município.
   Concluída localmente.
 - Fase 3: cargas incrementais, testes, validação de dados, cache, coleta agendada,
-  endpoint de saúde dos dados. ← atual
+  endpoint de saúde dos dados. Concluída (nov/2026).
 - Fase 4: análises (previsão de preços, correlação dólar × gasolina).
 - Fase 5: assistente com LLM (pergunta em português → SQL → resposta + gráfico).
 - Fase 6: README caprichado, diagrama, GIF de demo.

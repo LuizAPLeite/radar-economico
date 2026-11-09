@@ -6,9 +6,10 @@ camadas e exibe num dashboard web com gráficos e mapa.
 > **Fases 1 e 2 concluídas:** Selic, IPCA e dólar do Banco Central, e os
 > preços de combustíveis da ANP com mapa por município, de ponta a ponta,
 > rodando localmente com `docker compose up` (o deploy está configurado, mas
-> ainda não publicado). **Em andamento:** Fase 3, a operação dos dados:
-> registro das execuções, cache, cargas incrementais, saúde dos dados e
-> coleta agendada.
+> ainda não publicado). A Fase 3, a operação dos dados, também está
+> concluída: registro das execuções, validação em dois níveis, cache, cargas
+> incrementais, saúde dos dados, testes de contrato, coleta agendada e um
+> canário diário contra as fontes reais.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/combustiveis-escuro.png">
@@ -235,13 +236,44 @@ sem sair do Brasil.
 | Parte | Onde | Como publica |
 |---|---|---|
 | Banco | [Neon](https://neon.com) (Postgres 16, AWS `sa-east-1`) | as migrations rodam nos workflows |
-| Dados | GitHub Actions ([`data.yml`](.github/workflows/data.yml)) | disparo manual: migrations → coletor → pipeline |
+| Dados | GitHub Actions ([`data.yml`](.github/workflows/data.yml)) | todo dia às 9h (com a variável `COLETA_AGENDADA=true`) ou disparo manual: migrations → coletor → pipeline |
 | API | [Fly.io](https://fly.io) ([`api/fly.toml`](api/fly.toml), região `gru`) | `fly deploy --config api/fly.toml api` |
 | Dashboard | [Vercel](https://vercel.com) (pasta `web`, região `gru1`) | a cada push na `main` |
 
 Segredos nunca entram no código: `DATABASE_URL` (connection string **direta**
 do Neon, sem `-pooler`, com `sslmode=require`) fica nos secrets do GitHub e do
 Fly.io; `API_URL` (endereço da API no Fly.io) fica nas variáveis da Vercel.
+
+A coleta agendada não alcança o IBGE (ver o canário, abaixo). Os municípios
+quase nunca mudam: carregue-os uma vez, e quando o IBGE criar um município
+novo, a partir do seu computador. Defina a connection string do Neon na
+variável `DATABASE_URL` do terminal (no PowerShell,
+`$env:DATABASE_URL="..."`; nunca no código nem no git): o `-e DATABASE_URL`
+sem valor repassa a variável do terminal para o container.
+
+```bash
+docker compose run --rm --no-deps -e DATABASE_URL -e COLLECTOR_SOURCES=ibge collector
+docker compose run --rm --no-deps -e DATABASE_URL -e PIPELINE_JOBS=ibge pipeline
+```
+
+## Canário das fontes
+
+Fontes públicas mudam sem aviso: uma coluna nova no CSV da ANP, um endpoint
+diferente no Banco Central. O workflow [`fontes.yml`](.github/workflows/fontes.yml)
+roda todo dia às 7h30 e refaz o caminho inteiro contra as fontes reais,
+num Postgres temporário do próprio GitHub Actions: migrations → coleta
+(BCB, e a ANP só dos 2 últimos meses) → pipeline → API, que precisa responder
+`/health/data` com 200. Se algo mudou na fonte, ele falha e o GitHub avisa por
+e-mail no mesmo dia, antes de a coleta de produção dar problema. Os erros do
+coletor aparecem como anotações na página da execução, e o resultado de
+`/health/data` fica no resumo.
+
+Logo na primeira execução, o canário mostrou que **o IBGE recusa conexões
+vindas de fora do Brasil**, e os servidores do Actions ficam nos EUA. Por
+isso, tanto o canário quanto a coleta de produção buscam só o BCB e a ANP. No
+canário, os municípios (de que o job da ANP precisa) vêm de um retrato de
+93 KB em [`.github/canario/`](.github/canario/); em produção, são carregados
+uma vez a partir de uma máquina no Brasil (ver acima).
 
 ## Migrations
 
