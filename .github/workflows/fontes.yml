@@ -55,11 +55,18 @@ jobs:
 
       # Só os 2 últimos meses da ANP: o servidor deles é lento (~200 KB/s), e
       # para conferir o formato dos arquivos isso basta.
+      # Os erros do coletor (logs em JSON) viram anotações: aparecem no topo da
+      # página da execução, sem precisar abrir o log inteiro.
       - name: Coleta das fontes reais
         run: |
           export ANP_START_MONTH=$(date -u -d "$(date -u +%Y-%m-01) -2 months" +%Y-%m)
           echo "ANP a partir de $ANP_START_MONTH"
-          go run ./collector
+          set +e
+          go run ./collector 2>&1 | tee collector.log
+          status=${PIPESTATUS[0]}
+          set -e
+          grep '"level":"ERROR"' collector.log | jq -r '"::error::\(.msg): \(.err // "")"' | cut -c1-900 || true
+          exit "$status"
 
       - uses: astral-sh/setup-uv@v6
         with:
