@@ -3,10 +3,12 @@
 Coleta dados públicos brasileiros (Banco Central, IBGE e ANP), processa em
 camadas e exibe num dashboard web com gráficos e mapa.
 
+> **No ar: [radar-economico-phi.vercel.app](https://radar-economico-phi.vercel.app)**
+> (API em [radar-economico-api.onrender.com](https://radar-economico-api.onrender.com/health/data)).
+>
 > **Fases 1 e 2 concluídas:** Selic, IPCA e dólar do Banco Central, e os
 > preços de combustíveis da ANP com mapa por município, de ponta a ponta,
-> rodando localmente com `docker compose up` (o deploy está configurado, mas
-> ainda não publicado). A Fase 3, a operação dos dados, também está
+> publicados e também rodando localmente com `docker compose up`. A Fase 3, a operação dos dados, também está
 > concluída: registro das execuções, validação em dois níveis, cache, cargas
 > incrementais, saúde dos dados, testes de contrato, coleta agendada e um
 > canário diário contra as fontes reais.
@@ -230,19 +232,25 @@ docker run --rm -v "${PWD}:/src" -w /src/api sqlc/sqlc:1.31.1 generate
 
 ## Deploy
 
-Tudo em São Paulo, para cada visita fazer o caminho Vercel → API → banco
-sem sair do Brasil.
+Tudo em planos gratuitos, sem cartão de crédito.
 
 | Parte | Onde | Como publica |
 |---|---|---|
-| Banco | [Neon](https://neon.com) (Postgres 16, AWS `sa-east-1`) | as migrations rodam nos workflows |
+| Banco | [Neon](https://neon.com) Free (Postgres 16, AWS `sa-east-1`, São Paulo) | as migrations rodam nos workflows |
 | Dados | GitHub Actions ([`data.yml`](.github/workflows/data.yml)) | todo dia às 9h (com a variável `COLETA_AGENDADA=true`) ou disparo manual: migrations → coletor → pipeline |
-| API | [Fly.io](https://fly.io) ([`api/fly.toml`](api/fly.toml), região `gru`) | `fly deploy --config api/fly.toml api` |
-| Dashboard | [Vercel](https://vercel.com) (pasta `web`, região `gru1`) | a cada push na `main` |
+| API | [Render](https://render.com) Free ([`render.yaml`](render.yaml), Blueprint, região Virginia) | a cada push na `main` que mexa em `api/` |
+| Dashboard | [Vercel](https://vercel.com) Hobby (pasta `web`, região `gru1`, São Paulo) | a cada push na `main` |
+
+O plano grátis do Render desliga a API após 15 min sem requisições, e ela
+leva ~1 min para religar. O workflow [`keepalive.yml`](.github/workflows/keepalive.yml)
+consulta `/health` a cada 10 min (as 750 h grátis do mês cobrem o mês todo);
+como `/health` não toca no banco, o Neon continua dormindo quando ninguém
+visita. Se o agendamento atrasar, o dashboard espera até 70 s pela API.
 
 Segredos nunca entram no código: `DATABASE_URL` (connection string **direta**
-do Neon, sem `-pooler`, com `sslmode=require`) fica nos secrets do GitHub e do
-Fly.io; `API_URL` (endereço da API no Fly.io) fica nas variáveis da Vercel.
+do Neon, sem `-pooler`, com `sslmode=require`) fica nos secrets do GitHub e
+no painel do Render. `API_URL` (endereço da API no Render) fica nas variáveis
+da Vercel e nas variáveis do repositório (liga o keepalive).
 
 A coleta agendada não alcança o IBGE (ver o canário, abaixo). Os municípios
 quase nunca mudam: carregue-os uma vez, e quando o IBGE criar um município

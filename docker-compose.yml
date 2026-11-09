@@ -72,7 +72,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-radar}:${POSTGRES_PASSWORD:-radar}@postgres:5432/${POSTGRES_DB:-radar}?sslmode=disable
       PORT: "8080"
       # Cache curto no desenvolvimento: o que o pipeline grava aparece em até
-      # 1 minuto. Em produção vale 30m (api/fly.toml).
+      # 1 minuto. Em produção vale 30m (render.yaml).
       CACHE_TTL: ${CACHE_TTL:-1m}
     ports:
       - "${API_PORT:-8080}:8080"

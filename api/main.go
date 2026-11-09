@@ -51,7 +51,7 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	// Ctrl+C ou SIGTERM (docker stop, deploy no Fly.io) cancelam o contexto.
+	// Ctrl+C ou SIGTERM (docker stop, deploy no Render) cancelam o contexto.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

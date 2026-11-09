@@ -23,7 +23,7 @@ Qualidade e clareza importam mais que quantidade de features.
 - **db/migrations/** – schemas `raw`, `staging`, `mart` no PostgreSQL.
 - Infra: Docker Compose para desenvolvimento local; GitHub Actions para CI
   e para a coleta agendada.
-- Deploy alvo: front na Vercel, API no Fly.io ou Railway, banco no Neon ou Supabase.
+- Deploy: front na Vercel, API no Render, banco no Neon (ver "Decisões tomadas").
 
 ## Decisões tomadas
 - Monorepo com `go.work` na raiz unindo os módulos `collector` e `api`
@@ -122,15 +122,17 @@ Qualidade e clareza importam mais que quantidade de features.
   centavos, arredondados como na tela), uma escala só para o país; no escuro
   a escala inverte. A tabela com todos os municípios só é montada quando
   aberta (os dados já vêm para o mapa).
-- Deploy ADIADO por decisão de custo (nov/2026): a configuração está pronta,
-  mas nada foi publicado. Publicar quando o usuário decidir; Neon e Vercel são
-  grátis, só a API no Fly.io custa (~US$ 2/mês, exige cartão). Revisar os
-  preços na hora, ou considerar um host gratuito para a API.
-- Deploy planejado (tudo em São Paulo): Neon Free (Postgres 16, `sa-east-1`),
-  API no Fly.io (`gru`, auto-stop, menor máquina), web na Vercel Hobby (`gru1`,
-  raiz `web`). Coleta em produção pelo `data.yml`: diária às 9h de Brasília,
-  só com a variável do repositório `COLETA_AGENDADA=true` (ligar no deploy),
-  ou manual; o pipeline roda mesmo se uma fonte falhar. Coleta só BCB e ANP.
+- Deploy PUBLICADO (09/nov/2026), custo zero e sem cartão (exigência do
+  usuário: não gastar nada por enquanto; Fly.io e Cloud Run descartados por
+  exigirem cartão). Neon Free (Postgres 16, `sa-east-1`); API no Render Free
+  (`render.yaml`, Blueprint, região Virginia, https://radar-economico-api.onrender.com);
+  web na Vercel Hobby (`gru1`, raiz `web`, https://radar-economico-phi.vercel.app).
+  O Render dorme após 15 min sem uso: `keepalive.yml` chama `/health` a cada
+  10 min (só com a variável `API_URL` do repositório); o web espera até 70 s.
+  Segredo `DATABASE_URL` no GitHub e no Render; `API_URL` na Vercel e nas
+  variáveis do repositório. Coleta em produção pelo `data.yml`: diária às 9h
+  de Brasília (variável `COLETA_AGENDADA=true`, ligada), ou manual; o
+  pipeline roda mesmo se uma fonte falhar. Coleta só BCB e ANP.
 - O IBGE recusa conexões vindas de fora do Brasil (o Actions roda nos EUA:
   dial tcp timeout). Municípios em produção: carregar a partir de uma máquina
   no Brasil (comando no README, Deploy); mudam quase nunca.
@@ -199,16 +201,15 @@ Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
 ## Roteiro
 - Fase 0: monorepo, Docker Compose (Postgres; o Redis saiu na Fase 3), migrations, CI básico.
 - Fase 1: Banco Central (Selic, IPCA, dólar) de ponta a ponta, com deploy. ← MVP
-  Concluída localmente; o deploy ficou para depois (ver "Decisões tomadas").
+  Concluída e publicada (nov/2026).
 - Fase 2: ANP (combustíveis) + filtros + mapa por município.
-  Concluída localmente.
+  Concluída e publicada.
 - Fase 3: cargas incrementais, testes, validação de dados, cache, coleta agendada,
   endpoint de saúde dos dados. Concluída (nov/2026).
 - Fase 4: análises (previsão de preços, correlação dólar × gasolina).
 - Fase 5: assistente com LLM (pergunta em português → SQL → resposta + gráfico).
 - Fase 6: README caprichado, diagrama, GIF de demo.
-Não avançar de fase sem a anterior estar funcionando (exceção combinada: o
-deploy da Fase 1 fica para quando o usuário decidir gastar).
+Não avançar de fase sem a anterior estar funcionando.
 
 ## Como trabalhamos juntos
 - Estou aprendendo Go; explique as decisões e os padrões idiomáticos quando
