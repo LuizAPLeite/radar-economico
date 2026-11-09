@@ -3,10 +3,16 @@ name: Canário das fontes
 # Todo dia às 7h30 de Brasília (10h30 UTC), e por disparo manual.
 #
 # Refaz o caminho inteiro contra as fontes reais, num Postgres temporário do
-# próprio Actions: migrations → coleta (BCB, IBGE e ANP) → pipeline → API.
-# Se o BCB, o IBGE ou a ANP mudarem de formato (um CSV com colunas novas, um
-# endpoint que mudou), algum passo falha e o GitHub avisa por e-mail no mesmo
-# dia, antes de a coleta de produção dar problema. Não grava nada fora dele.
+# próprio Actions: migrations → coleta (BCB e ANP) → pipeline → API. Se o BCB
+# ou a ANP mudarem de formato (um CSV com colunas novas, um endpoint que
+# mudou), algum passo falha e o GitHub avisa por e-mail no mesmo dia, antes
+# de a coleta de produção dar problema. Não grava nada fora dele.
+#
+# O IBGE fica de fora: ele recusa conexões vindas de fora do Brasil (os
+# servidores do Actions ficam nos EUA). Os municípios, de que o job da ANP
+# precisa, vêm de um retrato em .github/canario/municipios.csv.gz. Para
+# regerá-lo a partir do banco local (raramente necessário):
+#   docker compose exec -T postgres psql -U radar -c "\copy (SELECT ibge_code, name, uf, latitude, longitude FROM staging.municipalities ORDER BY ibge_code) TO STDOUT WITH (FORMAT csv, HEADER)" | gzip -9n > .github/canario/municipios.csv.gz
 on:
   schedule:
     - cron: "30 10 * * *"
@@ -62,18 +68,29 @@ jobs:
           export ANP_START_MONTH=$(date -u -d "$(date -u +%Y-%m-01) -2 months" +%Y-%m)
           echo "ANP a partir de $ANP_START_MONTH"
           set +e
-          go run ./collector 2>&1 | tee collector.log
+          COLLECTOR_SOURCES=bcb_sgs,anp go run ./collector 2>&1 | tee collector.log
           status=${PIPESTATUS[0]}
           set -e
           grep '"level":"ERROR"' collector.log | jq -r '"::error::\(.msg): \(.err // "")"' | cut -c1-900 || true
           exit "$status"
+
+      # No lugar do job do IBGE: as mesmas tabelas que ele grava.
+      - name: Municípios do retrato
+        run: |
+          gunzip -c .github/canario/municipios.csv.gz |
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+              -c "\copy staging.municipalities (ibge_code, name, uf, latitude, longitude) FROM STDIN WITH (FORMAT csv, HEADER)"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "
+            INSERT INTO mart.municipalities (ibge_code, name, uf, latitude, longitude)
+            SELECT ibge_code, name, uf, latitude, longitude FROM staging.municipalities
+             WHERE latitude IS NOT NULL AND longitude IS NOT NULL"
 
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
       - name: Pipeline (raw → staging → mart)
         working-directory: pipeline
-        run: uv run --locked --no-dev radar-pipeline
+        run: PIPELINE_JOBS=bcb,anp uv run --locked --no-dev radar-pipeline
 
       # A API de verdade, sobre a mart recém-carregada: /health/data responde
       # 200 só se os quatro conjuntos estão em dia e nenhum job falhou.
