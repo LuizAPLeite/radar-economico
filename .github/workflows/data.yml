@@ -1,8 +1,15 @@
 name: Coleta de dados (produção)
 
-# Disparo manual: aba Actions → "Coleta de dados (produção)" → Run workflow.
-# O agendamento diário (cron) entra na Fase 3.
+# Todo dia às 9h de Brasília (12h UTC), e também por disparo manual:
+# aba Actions → "Coleta de dados (produção)" → Run workflow.
+#
+# O agendamento só roda quando a variável do repositório COLETA_AGENDADA
+# for "true" (Settings → Secrets and variables → Actions → Variables). Ela
+# fica desligada até o deploy: sem banco de produção, a coleta falharia
+# todo dia. O disparo manual funciona sempre.
 on:
+  schedule:
+    - cron: "0 12 * * *"
   workflow_dispatch:
 
 # Uma coleta por vez; uma nova espera a anterior terminar, nunca a interrompe.
@@ -13,8 +20,11 @@ concurrency:
 jobs:
   collect:
     name: Migrations, coleta e pipeline
+    if: github.event_name == 'workflow_dispatch' || vars.COLETA_AGENDADA == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # A primeira coleta da ANP (12 meses, servidor lento) leva vários minutos;
+    # as seguintes, incrementais, poucos.
+    timeout-minutes: 30
     env:
       # Connection string DIRETA do Neon (sem "-pooler"), cadastrada em
       # Settings → Secrets and variables → Actions. O GitHub esconde o valor nos logs.
@@ -38,12 +48,15 @@ jobs:
         with:
           go-version-file: go.work
           cache-dependency-path: "**/go.sum"
-      - name: Coleta (API SGS do Banco Central)
+      - name: Coleta (BCB, IBGE e ANP)
         run: go run ./collector
 
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
+      # Roda mesmo se a coleta de alguma fonte falhou: as outras podem ter
+      # trazido dados novos, e cada job do pipeline só lê o que deu certo.
       - name: Pipeline (raw → staging → mart)
+        if: ${{ !cancelled() }}
         working-directory: pipeline
         run: uv run --locked --no-dev radar-pipeline
