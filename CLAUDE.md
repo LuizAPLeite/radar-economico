@@ -83,6 +83,10 @@ Qualidade e clareza importam mais que quantidade de features.
   carga (que um skipped não esconde). 200 se tudo em dia; 503 se algo
   atrasou, está vazio ou o último job falhou. Leituras pelo cache;
   `Cache-Control: no-store`; a mensagem de erro do job não sai.
+- Teste de contrato (`httpapi/contract_test.go`, kin-openapi 0.153, só nos
+  testes): valida a própria `openapi.yaml` (inclusive os exemplos) e cada
+  resposta das rotas, de sucesso e de erro (400, 500, 503), contra ela. Rota
+  nova = caso novo na tabela do teste.
 - `httpapi.Store` embute uma interface por recurso (`IndicatorStore`,
   `FuelStore`, `HealthStore`); nos testes, `fakeStore` embute
   `fakeFuelStore` e `fakeHealthStore`.

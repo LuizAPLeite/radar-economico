@@ -196,6 +196,10 @@ curl "http://localhost:8080/v1/fuels/gasolina/prices?scope=SP&from=2026-09-01"
 ```
 
 Erros seguem sempre o formato `{"error": {"code": "...", "message": "..."}}`.
+A especificação não fica desatualizada: um teste de contrato
+([kin-openapi](https://github.com/getkin/kin-openapi)) valida cada resposta
+das rotas, de sucesso e de erro, contra a `openapi.yaml`, e o CI barra
+qualquer divergência.
 A conexão com o banco é aberta em modo somente leitura
 (`default_transaction_read_only`): o Postgres recusa qualquer escrita da API.
 
