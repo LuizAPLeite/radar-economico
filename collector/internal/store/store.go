@@ -165,6 +165,26 @@ func (s *Store) SaveANPFile(ctx context.Context, runID int64, f anp.File, sha256
 	return nil
 }
 
+// SaveSourceFile grava um arquivo já compactado de uma fonte, mas só se ele
+// mudou desde a última versão do mesmo arquivo (compara o SHA-256, no mesmo
+// comando SQL, como em SaveIBGE). Devolve se gravou.
+func (s *Store) SaveSourceFile(ctx context.Context, runID int64, source, name, url, sha256 string, size int64, gz []byte) (bool, error) {
+	tag, err := s.pool.Exec(ctx,
+		`INSERT INTO raw.source_files (run_id, source, name, url, sha256, size_bytes, content_gzip)
+		 SELECT $1, $2, $3, $4, $5, $6, $7
+		  WHERE $5 IS DISTINCT FROM (
+		        SELECT sha256 FROM raw.source_files
+		         WHERE source = $2 AND name = $3
+		         ORDER BY fetched_at DESC, id DESC
+		         LIMIT 1)`,
+		runID, source, name, url, sha256, size, gz,
+	)
+	if err != nil {
+		return false, fmt.Errorf("store: gravando arquivo %s/%s: %w", source, name, err)
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
 // dateOrNil converte a data zero (consulta sem filtro) em NULL.
 func dateOrNil(t time.Time) any {
 	if t.IsZero() {

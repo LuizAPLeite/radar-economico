@@ -71,6 +71,39 @@ func TestStore_SaveIBGESkipsUnchangedContent(t *testing.T) {
 	}
 }
 
+func TestStore_SaveSourceFileSkipsUnchangedContent(t *testing.T) {
+	s, pool := newTestStore(t)
+	ctx := context.Background()
+
+	runID, err := s.StartRun(ctx, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM raw.source_files WHERE run_id = $1`, runID)
+		_, _ = pool.Exec(ctx, `DELETE FROM raw.collection_runs WHERE id = $1`, runID)
+	})
+
+	steps := []struct {
+		name, file, sha string
+		wantSaved       bool
+	}{
+		{"arquivo novo é gravado", "teste-a", "hash-1", true},
+		{"o mesmo conteúdo de novo é ignorado", "teste-a", "hash-1", false},
+		{"o mesmo conteúdo em outro arquivo é gravado", "teste-b", "hash-1", true},
+		{"conteúdo diferente é gravado", "teste-a", "hash-2", true},
+	}
+	for _, st := range steps {
+		saved, err := s.SaveSourceFile(ctx, runID, "teste", st.file, "http://x/"+st.file, st.sha, 3, []byte{1, 2, 3})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if saved != st.wantSaved {
+			t.Errorf("%s: saved = %v, quer %v", st.name, saved, st.wantSaved)
+		}
+	}
+}
+
 func TestStore_ANPFiles(t *testing.T) {
 	s, pool := newTestStore(t)
 	ctx := context.Background()

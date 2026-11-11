@@ -1,4 +1,5 @@
-// Command collector coleta as fontes de dados (Banco Central, IBGE, ANP) e
+// Command collector coleta as fontes de dados (Banco Central, IBGE, ANP e a
+// série histórica semanal da ANP) e
 // grava o conteúdo bruto no schema raw. Roda uma vez e termina.
 //
 // Variáveis de ambiente:
@@ -140,6 +141,12 @@ func buildSources(cfg config, logger *slog.Logger, db *store.Store, today time.T
 			logger.Info("resumo da anp", "from", cfg.anpStart.Format("2006-01"),
 				"found", stats.Found, "downloaded", stats.Downloaded, "saved", stats.Saved,
 				"unchanged", stats.Unchanged, "failed", stats.Failed, "missing", stats.Missing)
+			return err
+		}},
+		{"anp_serie", func(ctx context.Context, runID int64) error {
+			// Planilhas pequenas (~700 KB juntas), mas no mesmo servidor lento.
+			stats, err := collect.Files(ctx, logger, fetch.NewClient(logger, 2*time.Minute), db, runID, "anp_serie", collect.ANPSeriesFiles)
+			logger.Info("resumo da anp_serie", "saved", stats.Saved, "unchanged", stats.Unchanged, "failed", stats.Failed)
 			return err
 		}},
 	}
