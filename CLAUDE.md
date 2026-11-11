@@ -127,10 +127,12 @@ Qualidade e clareza importam mais que quantidade de features.
   exigirem cartão). Neon Free (Postgres 16, `sa-east-1`); API no Render Free
   (`render.yaml`, Blueprint, região Virginia, https://radar-economico-api.onrender.com);
   web na Vercel Hobby (`gru1`, raiz `web`, https://radar-economico-phi.vercel.app).
-  O Render dorme após 15 min sem uso: `keepalive.yml` chama `/health` a cada
-  10 min (só com a variável `API_URL` do repositório); o web espera até 70 s.
-  Segredo `DATABASE_URL` no GitHub e no Render; `API_URL` na Vercel e nas
-  variáveis do repositório. Coleta em produção pelo `data.yml`: diária às 9h
+  O Render dorme após 15 min sem uso: um monitor do UptimeRobot (grátis, conta
+  do usuário) chama `/health` a cada 5 min e alerta por e-mail; o web espera
+  até 70 s. O workflow `keepalive.yml` foi removido (nov/2026): o GitHub
+  atrasava o cron de 10 min em até 8 h. Segredo `DATABASE_URL` no GitHub e no
+  Render; `API_URL` na Vercel (a variável `API_URL` do repositório sobrou
+  sem uso). Coleta em produção pelo `data.yml`: diária às 9h
   de Brasília (variável `COLETA_AGENDADA=true`, ligada), ou manual; o
   pipeline roda mesmo se uma fonte falhar. Coleta só BCB e ANP.
 - O IBGE recusa conexões vindas de fora do Brasil (o Actions roda nos EUA:

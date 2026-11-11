@@ -35,8 +35,8 @@ function apiUrl(): string {
 }
 
 // Em produção, a API (Render Free) e o banco (Neon) desligam quando ficam sem
-// uso. A API é mantida acordada (workflow keepalive.yml), mas, se o
-// agendamento atrasar, ela leva ~1 min para religar: a espera cobre isso.
+// uso. A API é mantida acordada (monitor do UptimeRobot a cada 5 min), mas,
+// se ela dormir mesmo assim, leva ~1 min para religar: a espera cobre isso.
 const TIMEOUT_MS = 70_000;
 
 async function getJSON<T>(path: string): Promise<T> {

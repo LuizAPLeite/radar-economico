@@ -3,8 +3,8 @@
 # valor de DATABASE_URL (a connection string DIRETA do Neon, sem -pooler).
 #
 # Plano Free: sem cartão e sem custo. O serviço dorme após 15 min sem
-# requisições e leva ~1 min para acordar; o workflow keepalive.yml consulta
-# /health a cada 10 min para ele não dormir (750 h grátis por mês cobrem o
+# requisições e leva ~1 min para acordar; um monitor do UptimeRobot consulta
+# /health a cada 5 min para ele não dormir (750 h grátis por mês cobrem o
 # mês inteiro). O /health não consulta o banco: o Neon continua dormindo.
 services:
   - type: web

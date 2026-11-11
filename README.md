@@ -242,15 +242,20 @@ Tudo em planos gratuitos, sem cartão de crédito.
 | Dashboard | [Vercel](https://vercel.com) Hobby (pasta `web`, região `gru1`, São Paulo) | a cada push na `main` |
 
 O plano grátis do Render desliga a API após 15 min sem requisições, e ela
-leva ~1 min para religar. O workflow [`keepalive.yml`](.github/workflows/keepalive.yml)
-consulta `/health` a cada 10 min (as 750 h grátis do mês cobrem o mês todo);
-como `/health` não toca no banco, o Neon continua dormindo quando ninguém
-visita. Se o agendamento atrasar, o dashboard espera até 70 s pela API.
+leva ~1 min para religar. Um monitor do [UptimeRobot](https://uptimerobot.com)
+(plano grátis) consulta `/health` a cada 5 min: mantém a API acordada (as
+750 h grátis do mês cobrem o mês todo) e avisa por e-mail se ela cair. Como
+`/health` não toca no banco, o Neon continua dormindo quando ninguém visita.
+Se a API ainda assim estiver dormindo, o dashboard espera até 70 s por ela.
+
+Um workflow agendado do GitHub Actions fez esse papel no começo, mas o
+GitHub atrasa agendamentos curtos: em dois dias, o "a cada 10 min" rodou
+7 vezes, com intervalos de até 8 horas.
 
 Segredos nunca entram no código: `DATABASE_URL` (connection string **direta**
 do Neon, sem `-pooler`, com `sslmode=require`) fica nos secrets do GitHub e
 no painel do Render. `API_URL` (endereço da API no Render) fica nas variáveis
-da Vercel e nas variáveis do repositório (liga o keepalive).
+da Vercel.
 
 A coleta agendada não alcança o IBGE (ver o canário, abaixo). Os municípios
 quase nunca mudam: carregue-os uma vez, e quando o IBGE criar um município
