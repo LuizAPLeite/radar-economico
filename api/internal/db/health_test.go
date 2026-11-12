@@ -15,6 +15,11 @@ func TestHealthQueries(t *testing.T) {
 		`DELETE FROM mart.indicator_values`,
 		`DELETE FROM mart.fuel_prices_municipal`,
 		`DELETE FROM mart.fuel_prices_weekly`,
+		`DELETE FROM mart.fuel_forecasts`,
+		`DELETE FROM mart.forecast_backtests`,
+		`DELETE FROM mart.analysis_rolling_correlations`,
+		`DELETE FROM mart.analysis_lag_correlations`,
+		`DELETE FROM mart.fuel_prices_anp_weekly`,
 		`DELETE FROM mart.pipeline_runs`,
 		`INSERT INTO mart.indicators (id, name, unit, frequency, source, source_code, source_run_id)
 		 VALUES ('usd_brl', 'Dólar', 'R$/US$', 'daily', 'BCB', '1', 7)
@@ -26,6 +31,8 @@ func TestHealthQueries(t *testing.T) {
 		`INSERT INTO mart.fuel_prices_weekly (product_id, scope, week_start, avg_price, n_stations) VALUES
 		   ('gasolina', 'BR', '2026-10-26', 6.505, 4560),
 		   ('gasolina', 'SP', '2026-11-02', 6.290, 900)`, // UF não conta: só a média do Brasil
+		`INSERT INTO mart.fuel_prices_anp_weekly (product_id, week_start, avg_price, n_stations) VALUES
+		   ('gasolina', '2026-10-26', 6.47, 4300), ('gasolina', '2026-11-02', 6.47, 4310)`,
 		// anp: uma carga com aviso e depois uma execução sem novidade;
 		// bcb: falhou e nunca deu certo.
 		`INSERT INTO mart.pipeline_runs
@@ -45,8 +52,9 @@ func TestHealthQueries(t *testing.T) {
 	for _, row := range freshness {
 		latest[row.Dataset] = row.Latest
 	}
-	// Sem nenhum IPCA nem Selic, eles simplesmente não aparecem.
-	if len(latest) != 2 || !latest["usd_brl"].Equal(d(2026, 11, 6)) || !latest["fuels"].Equal(d(2026, 10, 26)) {
+	// Sem nenhum IPCA, Selic nem Brent, eles simplesmente não aparecem.
+	if len(latest) != 3 || !latest["usd_brl"].Equal(d(2026, 11, 6)) || !latest["fuels"].Equal(d(2026, 10, 26)) ||
+		!latest["fuels_series"].Equal(d(2026, 11, 2)) {
 		t.Errorf("freshness = %+v", freshness)
 	}
 

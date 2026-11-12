@@ -40,6 +40,11 @@ var datasets = []dataset{
 	// A ANP publica um arquivo por mês, semanas depois do fim dele: a última
 	// semana publicada chega a ~40 dias, e a publicação às vezes atrasa.
 	{"fuels", "Preços de combustíveis (ANP)", 60},
+	// O FRED publica o Brent com cerca de uma semana de atraso (dado da EIA).
+	{"brent", "Petróleo Brent", 15},
+	// A série semanal oficial da ANP sai na sexta da semana pesquisada; o
+	// prazo cobre um atraso de duas semanas na publicação.
+	{"fuels_series", "Série semanal oficial da ANP", 21},
 }
 
 // now é o relógio do endpoint; os testes trocam por um fixo.

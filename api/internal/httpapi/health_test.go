@@ -42,6 +42,8 @@ var freshData = []db.ListDatasetFreshnessRow{
 	{Dataset: "selic", Latest: d(2026, 11, 8)},   // a meta Selic tem valor todo dia
 	{Dataset: "usd_brl", Latest: d(2026, 11, 6)}, // sexta-feira
 	{Dataset: "fuels", Latest: d(2026, 10, 26)},
+	{Dataset: "brent", Latest: d(2026, 11, 3)},        // o FRED publica com atraso
+	{Dataset: "fuels_series", Latest: d(2026, 11, 2)}, // semana de 01/11 a 07/11 da ANP
 }
 
 func ts(hour int) time.Time { return time.Date(2026, 11, 8, hour, 0, 0, 0, time.UTC) }
@@ -62,7 +64,7 @@ func TestBuildHealthReport_AllFresh(t *testing.T) {
 		}
 		got[ds.ID] = *ds.AgeDays
 	}
-	want := map[string]int{"selic": 0, "usd_brl": 2, "ipca": 68, "fuels": 13}
+	want := map[string]int{"selic": 0, "usd_brl": 2, "ipca": 68, "fuels": 13, "brent": 5, "fuels_series": 6}
 	for id, age := range want {
 		if got[id] != age {
 			t.Errorf("%s: %d dias, quer %d", id, got[id], age)
@@ -87,6 +89,8 @@ func TestBuildHealthReport_StaleAndMissing(t *testing.T) {
 		{Dataset: "selic", Latest: d(2026, 11, 8)},
 		{Dataset: "usd_brl", Latest: d(2026, 11, 2)}, // 6 dias: passou do prazo de 5
 		{Dataset: "fuels", Latest: d(2026, 10, 26)},
+		{Dataset: "brent", Latest: d(2026, 11, 3)},
+		{Dataset: "fuels_series", Latest: d(2026, 11, 2)},
 		// sem IPCA nenhum
 	}
 	report, err := buildHealthReport(sunday, data, nil, nil)
@@ -151,13 +155,15 @@ func TestHealthData(t *testing.T) {
 	}}
 	rec := do(t, store, http.MethodGet, "/health/data")
 
-	// Faltam três conjuntos: 503, com o corpo dizendo quais.
+	// Faltam cinco conjuntos: 503, com o corpo dizendo quais.
 	assertJSON(t, rec, http.StatusServiceUnavailable, `{"status":"degraded","checked_at":"2026-11-08T13:00:00Z",`+
 		`"datasets":[`+
 		`{"id":"selic","name":"Meta Selic","latest":null,"age_days":null,"max_age_days":5,"status":"missing"},`+
 		`{"id":"usd_brl","name":"Dólar comercial (venda)","latest":null,"age_days":null,"max_age_days":5,"status":"missing"},`+
 		`{"id":"ipca","name":"IPCA (variação mensal)","latest":"2026-09-01","age_days":68,"max_age_days":75,"status":"ok"},`+
-		`{"id":"fuels","name":"Preços de combustíveis (ANP)","latest":null,"age_days":null,"max_age_days":60,"status":"missing"}],`+
+		`{"id":"fuels","name":"Preços de combustíveis (ANP)","latest":null,"age_days":null,"max_age_days":60,"status":"missing"},`+
+		`{"id":"brent","name":"Petróleo Brent","latest":null,"age_days":null,"max_age_days":15,"status":"missing"},`+
+		`{"id":"fuels_series","name":"Série semanal oficial da ANP","latest":null,"age_days":null,"max_age_days":21,"status":"missing"}],`+
 		`"jobs":[{"job":"bcb","last_status":"success","last_run_at":"2026-11-08T12:00:00Z",`+
 		`"last_success_at":"2026-11-08T12:00:00Z","collected_at":"2026-11-08T11:00:00Z","warnings":[]}]}`)
 	if cc := rec.Header().Get("Cache-Control"); cc != "no-store" {

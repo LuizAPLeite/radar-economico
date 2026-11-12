@@ -21,6 +21,10 @@ SELECT 'fuels', max(week_start)::date
   FROM mart.fuel_prices_weekly
  WHERE scope = 'BR'
 HAVING count(*) > 0
+UNION ALL
+SELECT 'fuels_series', max(week_start)::date
+  FROM mart.fuel_prices_anp_weekly
+HAVING count(*) > 0
 `
 
 type ListDatasetFreshnessRow struct {
@@ -29,7 +33,8 @@ type ListDatasetFreshnessRow struct {
 }
 
 // Data do dado mais recente de cada conjunto que o site mostra: um por
-// indicador e um para os combustíveis (a média nacional semanal). Um
+// indicador (o Brent inclusive), um para os combustíveis (a média nacional
+// semanal calculada dos postos) e um para a série oficial da ANP. Um
 // conjunto sem nenhum dado simplesmente não aparece; a API o trata como
 // ausente.
 func (q *Queries) ListDatasetFreshness(ctx context.Context) ([]ListDatasetFreshnessRow, error) {

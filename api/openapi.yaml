@@ -634,7 +634,7 @@ components:
       properties:
         id:
           type: string
-          enum: [selic, usd_brl, ipca, fuels]
+          enum: [selic, usd_brl, ipca, fuels, brent, fuels_series]
         name:
           type: string
           examples: [Meta Selic]
