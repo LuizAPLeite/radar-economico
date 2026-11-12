@@ -11,8 +11,11 @@ import (
 )
 
 // NewRouter monta as rotas e os middlewares da API.
-func NewRouter(store Store, logger *slog.Logger, openAPISpec []byte) http.Handler {
+func NewRouter(store Store, logger *slog.Logger, openAPISpec []byte, opts ...Option) http.Handler {
 	h := &handlers{store: store, logger: logger}
+	for _, opt := range opts {
+		opt(h)
+	}
 
 	r := chi.NewRouter()
 
@@ -42,6 +45,7 @@ func NewRouter(store Store, logger *slog.Logger, openAPISpec []byte) http.Handle
 		r.Get("/fuels/{id}/municipalities", h.listFuelMunicipalities)
 		r.Get("/fuels/{id}/pass-through", h.getPassThrough)
 		r.Get("/fuels/{id}/forecast", h.getForecast)
+		r.Post("/ask", h.ask)
 	})
 	return r
 }

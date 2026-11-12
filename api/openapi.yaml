@@ -383,6 +383,70 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /v1/ask:
+    post:
+      operationId: ask
+      summary: Pergunta em português sobre os dados (assistente com LLM)
+      description: |
+        Um modelo de linguagem (Gemini) transforma a pergunta numa consulta
+        SQL sobre a mart; a API confere a consulta (um único SELECT, sem
+        comentários), executa num papel do Postgres que só lê algumas tabelas,
+        numa transação somente leitura, com tempo máximo de 3 s e até 500
+        linhas, e devolve os dados, o SQL usado e uma sugestão de gráfico.
+        Respostas iguais ficam guardadas por 24 h (`cached`); perguntas novas
+        têm um limite por dia. `Cache-Control: no-store`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              additionalProperties: false
+              properties:
+                question:
+                  type: string
+                  minLength: 3
+                  maxLength: 300
+                  examples: ["Como o preço da gasolina variou desde 2020?"]
+      responses:
+        "200":
+          description: Resposta (com dados, ou explicando por que os dados não respondem)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Answer"
+        "400":
+          description: Corpo ou pergunta inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: O modelo não montou uma consulta válida para a pergunta
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Limite de perguntas do dia (ou cota do modelo) atingido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          description: O provedor do modelo de linguagem falhou
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: Assistente desligado neste servidor (sem chave do modelo)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   parameters:
     FuelID:
@@ -608,6 +672,62 @@ components:
           description: Erro percentual médio (%)
         n_forecasts:
           type: integer
+
+    Answer:
+      type: object
+      required: [question, answerable, title, explanation, sql, chart, columns, rows, truncated, cached]
+      properties:
+        question:
+          type: string
+        answerable:
+          type: boolean
+          description: false quando os dados não respondem à pergunta (sql vazio, sem linhas)
+        title:
+          type: string
+        explanation:
+          type: string
+          description: O que a consulta mostra, escrito pelo modelo, em português
+        sql:
+          type: string
+          description: A consulta executada (vazia se answerable é false)
+        chart:
+          type: object
+          required: [type, x, y]
+          properties:
+            type:
+              type: string
+              enum: [line, bar, none]
+            x:
+              type: string
+              description: Coluna do eixo X (vazia em none)
+            y:
+              type: array
+              items:
+                type: string
+        columns:
+          type: array
+          items:
+            type: object
+            required: [name, type]
+            properties:
+              name:
+                type: string
+              type:
+                type: string
+                enum: [date, number, text]
+        rows:
+          type: array
+          description: Linhas do resultado; datas como AAAA-MM-DD, números como número, NULL como null
+          items:
+            type: array
+            items:
+              type: [string, number, boolean, "null"]
+        truncated:
+          type: boolean
+          description: true quando havia mais de 500 linhas
+        cached:
+          type: boolean
+          description: true quando a resposta veio do cache (sem gastar a cota do modelo)
 
     HealthReport:
       type: object

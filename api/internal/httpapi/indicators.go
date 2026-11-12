@@ -38,6 +38,7 @@ type IndicatorStore interface {
 type handlers struct {
 	store  Store
 	logger *slog.Logger
+	asker  Asker // nil: assistente desligado
 }
 
 // --- Formatos das respostas ---------------------------------------------------

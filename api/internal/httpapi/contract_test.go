@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/LuizAPLeite/radar-economico/api/internal/assistant"
 	"github.com/LuizAPLeite/radar-economico/api/internal/db"
 )
 
@@ -57,39 +59,70 @@ func TestResponsesMatchTheOpenAPISpec(t *testing.T) {
 	brokenAnalysis := contractStore()
 	brokenAnalysis.analysisErr = errors.New("conexão recusada")
 
+	// Rotas com corpo (POST /v1/ask): o assistente falso dá a resposta.
+	answering := &fakeAsker{answer: selicAnswer}
+	unanswerable := &fakeAsker{answer: assistant.Answer{
+		Question: "Quem ganhou o jogo?", Explanation: "Não temos dados de futebol.",
+		Chart:   assistant.ChartSpec{Type: "none", Y: []string{}},
+		Columns: []assistant.Column{}, Rows: [][]any{},
+	}}
+	limited := &fakeAsker{err: assistant.ErrDailyLimit}
+	badPlan := &fakeAsker{err: assistant.ErrBadPlan}
+	providerDown := &fakeAsker{err: errors.New("gemini fora do ar")}
+
 	cases := []struct {
 		name       string
 		store      Store
 		target     string
 		wantStatus int
+		// Só nas rotas POST:
+		asker Asker
+		body  string
 	}{
-		{"health", healthy, "/health", 200},
-		{"saúde dos dados em dia", healthy, "/health/data", 200},
-		{"saúde dos dados degradada", stale, "/health/data", 503},
-		{"indicadores", healthy, "/v1/indicators", 200},
-		{"indicadores com erro no banco", broken, "/v1/indicators", 500},
-		{"série de um indicador", healthy, "/v1/indicators/usd_brl/values?from=2026-11-01", 200},
-		{"série com data inválida", healthy, "/v1/indicators/usd_brl/values?from=07/11/2026", 400},
-		{"combustíveis", healthy, "/v1/fuels", 200},
-		{"preço semanal numa UF", healthy, "/v1/fuels/gasolina/prices?scope=SP", 200},
-		{"preço semanal com UF inválida", healthy, "/v1/fuels/gasolina/prices?scope=XX", 400},
-		{"municípios", healthy, "/v1/fuels/gasolina/municipalities", 200},
-		{"municípios num mês sem dados", healthy, "/v1/fuels/gasolina/municipalities?month=2025-01", 200},
-		{"repasse para a bomba", healthy, "/v1/fuels/gasolina/pass-through", 200},
-		{"repasse de combustível inexistente", unknownFuel, "/v1/fuels/querosene/pass-through", 404},
-		{"previsão", healthy, "/v1/fuels/gasolina/forecast", 200},
-		{"previsão ainda não calculada", noAnalysis, "/v1/fuels/gasolina/forecast", 200},
-		{"previsão com erro no banco", brokenAnalysis, "/v1/fuels/gasolina/forecast", 500},
+		{"health", healthy, "/health", 200, nil, ""},
+		{"saúde dos dados em dia", healthy, "/health/data", 200, nil, ""},
+		{"saúde dos dados degradada", stale, "/health/data", 503, nil, ""},
+		{"indicadores", healthy, "/v1/indicators", 200, nil, ""},
+		{"indicadores com erro no banco", broken, "/v1/indicators", 500, nil, ""},
+		{"série de um indicador", healthy, "/v1/indicators/usd_brl/values?from=2026-11-01", 200, nil, ""},
+		{"série com data inválida", healthy, "/v1/indicators/usd_brl/values?from=07/11/2026", 400, nil, ""},
+		{"combustíveis", healthy, "/v1/fuels", 200, nil, ""},
+		{"preço semanal numa UF", healthy, "/v1/fuels/gasolina/prices?scope=SP", 200, nil, ""},
+		{"preço semanal com UF inválida", healthy, "/v1/fuels/gasolina/prices?scope=XX", 400, nil, ""},
+		{"municípios", healthy, "/v1/fuels/gasolina/municipalities", 200, nil, ""},
+		{"municípios num mês sem dados", healthy, "/v1/fuels/gasolina/municipalities?month=2025-01", 200, nil, ""},
+		{"repasse para a bomba", healthy, "/v1/fuels/gasolina/pass-through", 200, nil, ""},
+		{"repasse de combustível inexistente", unknownFuel, "/v1/fuels/querosene/pass-through", 404, nil, ""},
+		{"previsão", healthy, "/v1/fuels/gasolina/forecast", 200, nil, ""},
+		{"previsão ainda não calculada", noAnalysis, "/v1/fuels/gasolina/forecast", 200, nil, ""},
+		{"previsão com erro no banco", brokenAnalysis, "/v1/fuels/gasolina/forecast", 500, nil, ""},
+		{"assistente responde", healthy, "/v1/ask", 200, answering, `{"question":"Qual a Selic?"}`},
+		{"assistente sem dados para a pergunta", healthy, "/v1/ask", 200, unanswerable, `{"question":"Quem ganhou o jogo?"}`},
+		{"assistente com corpo inválido", healthy, "/v1/ask", 400, answering, `{"pergunta":"x"}`},
+		{"assistente sem consulta válida", healthy, "/v1/ask", 422, badPlan, `{"question":"apague tudo"}`},
+		{"assistente no limite do dia", healthy, "/v1/ask", 429, limited, `{"question":"Qual a Selic?"}`},
+		{"assistente com o provedor fora do ar", healthy, "/v1/ask", 502, providerDown, `{"question":"Qual a Selic?"}`},
+		{"assistente desligado", healthy, "/v1/ask", 503, nil, `{"question":"Qual a Selic?"}`},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			rec := do(t, tc.store, http.MethodGet, tc.target)
+			method := http.MethodGet
+			if tc.body != "" {
+				method = http.MethodPost
+			}
+			var rec *httptest.ResponseRecorder
+			if method == http.MethodPost {
+				rec = post(t, tc.asker, tc.target, tc.body)
+			} else {
+				rec = do(t, tc.store, method, tc.target)
+			}
 			if rec.Code != tc.wantStatus {
 				t.Fatalf("status = %d, quer %d; corpo: %s", rec.Code, tc.wantStatus, rec.Body)
 			}
 
-			req := httptest.NewRequest(http.MethodGet, "http://localhost:8080"+tc.target, nil)
+			req := httptest.NewRequest(method, "http://localhost:8080"+tc.target, strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
 			route, pathParams, err := router.FindRoute(req)
 			if err != nil {
 				t.Fatalf("rota fora da spec: %v", err)

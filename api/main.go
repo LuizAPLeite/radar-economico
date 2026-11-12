@@ -6,6 +6,11 @@
 //	PORT          porta HTTP (padrão 8080)
 //	CACHE_TTL     por quanto tempo guardar em memória o que vem da mart,
 //	              como 30m ou 1h (padrão 30m; 0 desliga o cache)
+//	GEMINI_API_KEY  chave da API do Gemini; sem ela, o assistente (POST
+//	              /v1/ask) fica desligado e responde 503
+//	GEMINI_MODEL  modelo do Gemini (padrão gemini-3.8-flash)
+//	ASSISTANT_DAILY_LIMIT  perguntas novas por dia, abaixo da cota grátis
+//	              do Gemini (padrão 20; respostas guardadas não contam)
 package main
 
 import (
@@ -17,9 +22,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
+	"github.com/LuizAPLeite/radar-economico/api/internal/assistant"
 	"github.com/LuizAPLeite/radar-economico/api/internal/cachedstore"
 	"github.com/LuizAPLeite/radar-economico/api/internal/db"
 	"github.com/LuizAPLeite/radar-economico/api/internal/httpapi"
@@ -72,15 +79,40 @@ func run(logger *slog.Logger) error {
 		logger.Info("cache em memória desligado (CACHE_TTL=0)")
 	}
 
+	var opts []httpapi.Option
+	if key := os.Getenv("GEMINI_API_KEY"); key != "" {
+		limit, err := intEnv("ASSISTANT_DAILY_LIMIT", 20)
+		if err != nil {
+			return err
+		}
+		loc, err := time.LoadLocation("America/Sao_Paulo")
+		if err != nil {
+			return err
+		}
+		model := envOr("GEMINI_MODEL", "gemini-3.8-flash")
+		today := func() string { return time.Now().In(loc).Format(time.DateOnly) }
+		svc := assistant.NewService(
+			assistant.NewGeminiPlanner(key, model, today),
+			&assistant.PgExecutor{Pool: pool},
+			logger, limit, loc,
+		)
+		opts = append(opts, httpapi.WithAssistant(svc))
+		logger.Info("assistente ligado", "model", model, "daily_limit", limit)
+	} else {
+		logger.Info("assistente desligado (sem GEMINI_API_KEY)")
+	}
+
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: httpapi.NewRouter(store, logger, openAPISpec),
+		Handler: httpapi.NewRouter(store, logger, openAPISpec, opts...),
 		// Timeouts explícitos: o http.Server padrão não tem nenhum,
 		// o que deixa conexões lentas presas para sempre.
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      15 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		// Uma pergunta ao assistente espera o LLM (até ~45 s); o resto
+		// responde em milissegundos.
+		WriteTimeout: 60 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	// ListenAndServe bloqueia até o servidor parar, então roda numa goroutine.
@@ -115,6 +147,19 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// intEnv lê um inteiro positivo.
+func intEnv(key string, fallback int) (int, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback, nil
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 1 {
+		return 0, fmt.Errorf("%s inválida (%q): use um número inteiro positivo", key, v)
+	}
+	return n, nil
 }
 
 // durationEnv lê uma duração no formato do time.ParseDuration ("30m", "1h30m", "0").
