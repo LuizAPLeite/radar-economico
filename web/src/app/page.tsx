@@ -12,10 +12,12 @@ export default function Home() {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-10 sm:py-12">
       <header className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-ink">Selic, inflação e dólar</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-ink">
+          Selic, inflação, dólar e petróleo
+        </h1>
         <p className="mt-2 max-w-2xl text-ink-2">
-          Os indicadores direto do Banco Central: coletados, validados e servidos por um pipeline de
-          dados próprio.
+          Os indicadores do Banco Central e o petróleo Brent (FRED): coletados, validados e servidos
+          por um pipeline de dados próprio.
         </p>
       </header>
 
@@ -26,8 +28,8 @@ export default function Home() {
       </main>
 
       <footer className="mt-12 border-t border-hairline pt-6 text-sm text-ink-2">
-        Fonte: Banco Central do Brasil, Sistema Gerenciador de Séries Temporais (SGS). Código aberto
-        no{" "}
+        Fontes: Banco Central do Brasil, Sistema Gerenciador de Séries Temporais (SGS); petróleo
+        Brent da EIA, via FRED (Federal Reserve Bank of St. Louis). Código aberto no{" "}
         <a
           className="text-ink underline underline-offset-4 hover:no-underline"
           href="https://github.com/LuizAPLeite/radar-economico"

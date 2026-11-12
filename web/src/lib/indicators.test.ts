@@ -142,6 +142,17 @@ describe("cards", () => {
     assert.equal(card.direction, "up");
   });
 
+  test("Brent em dólares, com a variação sobre o pregão anterior", () => {
+    const card = buildCard(indicator("brent", "Petróleo Brent", p("2026-11-03", 107.03)), [
+      p("2026-10-30", 108.1),
+      p("2026-11-03", 107.03),
+    ]);
+    assert.equal(card.value, "US$ 107,03");
+    assert.equal(card.context, "em 03/11/2026");
+    assert.equal(card.detail, "-0,99% sobre 30/10/2026");
+    assert.equal(card.direction, "down");
+  });
+
   test("sem histórico suficiente, o card fica sem detalhe", () => {
     const card = buildCard(indicator("usd_brl", "Dólar", p("2026-11-06", 5.5)), [p("2026-11-06", 5.5)]);
     assert.equal(card.detail, null);

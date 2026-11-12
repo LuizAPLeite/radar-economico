@@ -7,7 +7,7 @@ import { IndicatorCard } from "./IndicatorCard";
 
 // Ordem de exibição. Um indicador novo que a API passar a ter entra no fim,
 // com o formato genérico.
-const DISPLAY_ORDER = ["selic", "ipca", "usd_brl"];
+const DISPLAY_ORDER = ["selic", "ipca", "usd_brl", "brent"];
 
 function rank(indicator: IndicatorWithLatest): number {
   const i = DISPLAY_ORDER.indexOf(indicator.id);
@@ -38,7 +38,7 @@ export async function Dashboard() {
 
   return (
     <>
-      <section aria-label="Valores mais recentes" className="grid gap-4 sm:grid-cols-3">
+      <section aria-label="Valores mais recentes" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {indicators.map((indicator, k) => (
           <IndicatorCard key={indicator.id} card={buildCard(indicator, series[k])} />
         ))}
@@ -68,9 +68,9 @@ export function DashboardSkeleton() {
   return (
     <div aria-busy="true">
       <p role="status" className="sr-only">
-        Carregando os dados do Banco Central…
+        Carregando os indicadores…
       </p>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {DISPLAY_ORDER.map((id) => (
           <div key={id} className="h-40 animate-pulse rounded-xl border border-hairline bg-surface" />
         ))}

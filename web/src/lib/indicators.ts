@@ -63,6 +63,8 @@ export function formatIndicatorValue(id: string, value: number): string {
   switch (id) {
     case "usd_brl":
       return `R$ ${formatNumber(value, 4)}`;
+    case "brent":
+      return `US$ ${formatNumber(value, 2)}`;
     case "selic":
     case "ipca":
       return `${formatNumber(value, 2)}%`;
@@ -163,7 +165,9 @@ export function buildCard(indicator: IndicatorWithLatest, series: Point[]): Card
         direction: null,
       };
     }
-    case "usd_brl": {
+    // Cotações diárias: a variação em relação ao dia anterior com cotação.
+    case "usd_brl":
+    case "brent": {
       const change = lastChangePercent(series);
       return {
         ...base,
