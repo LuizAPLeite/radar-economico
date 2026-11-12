@@ -74,6 +74,11 @@ services:
       # Cache curto no desenvolvimento: o que o pipeline grava aparece em até
       # 1 minuto. Em produção vale 30m (render.yaml).
       CACHE_TTL: ${CACHE_TTL:-1m}
+      # Assistente (POST /v1/ask): sem a chave, fica desligado. A chave vem
+      # do .env (nunca do repositório).
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      ASSISTANT_DAILY_LIMIT: ${ASSISTANT_DAILY_LIMIT:-20}
     ports:
       - "${API_PORT:-8080}:8080"
     restart: unless-stopped
