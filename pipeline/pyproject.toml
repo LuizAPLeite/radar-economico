@@ -5,6 +5,7 @@ description = "Limpeza, validação e análise dos dados do Radar Econômico"
 requires-python = ">=3.13"
 dependencies = [
     "fastexcel>=0.21.0",
+    "numpy>=2.5.4",
     "pandera[polars]>=0.35.0",
     "polars>=2.1.0",
     "psycopg[binary]>=3.3.8",

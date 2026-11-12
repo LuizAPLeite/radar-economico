@@ -3,7 +3,8 @@
 Variáveis de ambiente:
     DATABASE_URL           obrigatória
     PIPELINE_JOBS          jobs a rodar, separados por vírgula (padrão: todos,
-                           na ordem bcb, fred, ibge, anp, anp_serie)
+                           na ordem bcb, fred, ibge, anp, anp_serie,
+                           analysis)
     PIPELINE_FULL_REFRESH  true: reprocessa todo o raw e reconstrói staging e
                            mart, mesmo sem nada novo (padrão: só o que chegou)
 """
@@ -18,6 +19,7 @@ from datetime import UTC, datetime
 import psycopg
 
 from radar_pipeline import runs
+from radar_pipeline.analysis import job as analysis_job
 from radar_pipeline.anp import job as anp_job
 from radar_pipeline.anp_serie import job as anp_serie_job
 from radar_pipeline.bcb import job as bcb_job
@@ -30,13 +32,15 @@ Job = Callable[[psycopg.Connection], runs.JobSummary | None]
 
 # A ordem importa: o job da ANP casa os municípios com a tabela que o job do
 # IBGE grava, e o da série da ANP compara a média oficial com a que o job da
-# ANP calcula. Os jobs não se chamam: cada um lê o que precisa do banco.
+# ANP calcula; a análise usa o que os anteriores gravaram. Os jobs não se
+# chamam: cada um lê o que precisa do banco.
 JOBS: dict[str, Job] = {
     bcb_job.NAME: bcb_job.run,
     fred_job.NAME: fred_job.run,
     ibge_job.NAME: ibge_job.run,
     anp_job.NAME: anp_job.run,
     anp_serie_job.NAME: anp_serie_job.run,
+    analysis_job.NAME: analysis_job.run,
 }
 
 
