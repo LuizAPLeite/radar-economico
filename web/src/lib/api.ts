@@ -109,6 +109,74 @@ export async function getFuelPrices(id: string, scope: string): Promise<WeekPric
   return body.data;
 }
 
+// --- Análises -------------------------------------------------------------------
+
+export type Driver = "usd_brl" | "brent_usd" | "brent_brl";
+
+/** Período da política de preços da Petrobras. */
+export interface Regime {
+  id: string;
+  name: string;
+  starts_on: string;
+  ends_on: string | null; // null = período atual
+  description: string;
+}
+
+export interface LagCorrelation {
+  driver: Driver;
+  regime_id: string;
+  lag_weeks: number;
+  correlation: number;
+  n_weeks: number;
+}
+
+export interface RollingCorrelation {
+  driver: Driver;
+  week_start: string; // última semana da janela de 52
+  lag_weeks: number;
+  correlation: number;
+}
+
+export interface PassThrough {
+  fuel: Fuel;
+  regimes: Regime[];
+  lags: LagCorrelation[];
+  rolling: RollingCorrelation[];
+}
+
+export interface ForecastPoint {
+  week_start: string;
+  horizon_weeks: number;
+  predicted: number;
+  lower_80: number;
+  upper_80: number;
+}
+
+export interface Backtest {
+  model: string; // "naive" ou "brent"
+  horizon_weeks: number;
+  mae: number;
+  mape: number;
+  n_forecasts: number;
+}
+
+export interface Forecast {
+  fuel: Fuel;
+  model: string | null;
+  base_week: string | null;
+  history: WeekPrice[];
+  forecasts: ForecastPoint[];
+  backtests: Backtest[];
+}
+
+export async function getPassThrough(id: string): Promise<PassThrough> {
+  return getJSON<PassThrough>(`/v1/fuels/${encodeURIComponent(id)}/pass-through`);
+}
+
+export async function getForecast(id: string): Promise<Forecast> {
+  return getJSON<Forecast>(`/v1/fuels/${encodeURIComponent(id)}/forecast`);
+}
+
 /** Preço por município num mês (null = o mais recente). */
 export async function getFuelMunicipalities(id: string, month: string | null): Promise<FuelMunicipalities> {
   const query = month ? `?month=${encodeURIComponent(month)}` : "";
