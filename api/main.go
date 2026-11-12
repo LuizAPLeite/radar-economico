@@ -10,7 +10,8 @@
 //	              /v1/ask) fica desligado e responde 503
 //	GEMINI_MODEL  modelo do Gemini (padrão gemini-3.5-flash-lite)
 //	ASSISTANT_DAILY_LIMIT  perguntas novas por dia, abaixo da cota grátis
-//	              do Gemini (padrão 20; respostas guardadas não contam)
+//	              do Gemini (padrão 400: o 3.5-flash-lite grátis permite 500
+//	              por dia e 15 por minuto; respostas guardadas não contam)
 package main
 
 import (
@@ -81,7 +82,7 @@ func run(logger *slog.Logger) error {
 
 	var opts []httpapi.Option
 	if key := os.Getenv("GEMINI_API_KEY"); key != "" {
-		limit, err := intEnv("ASSISTANT_DAILY_LIMIT", 20)
+		limit, err := intEnv("ASSISTANT_DAILY_LIMIT", 400)
 		if err != nil {
 			return err
 		}

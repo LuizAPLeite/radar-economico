@@ -78,7 +78,7 @@ services:
       # do .env (nunca do repositório).
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
-      ASSISTANT_DAILY_LIMIT: ${ASSISTANT_DAILY_LIMIT:-20}
+      ASSISTANT_DAILY_LIMIT: ${ASSISTANT_DAILY_LIMIT:-400}
     ports:
       - "${API_PORT:-8080}:8080"
     restart: unless-stopped
