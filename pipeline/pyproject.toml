@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Limpeza, validação e análise dos dados do Radar Econômico"
 requires-python = ">=3.13"
 dependencies = [
+    "fastexcel>=0.21.0",
     "pandera[polars]>=0.35.0",
     "polars>=2.1.0",
     "psycopg[binary]>=3.3.8",
@@ -20,6 +21,7 @@ build-backend = "uv_build"
 dev = [
     "pytest>=9.2.0",
     "ruff>=0.17.4",
+    "xlsxwriter>=3.3.1",
 ]
 
 [tool.ruff]

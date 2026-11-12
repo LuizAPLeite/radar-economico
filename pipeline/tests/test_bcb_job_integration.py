@@ -130,7 +130,8 @@ def test_job_fills_staging_and_mart(conn):
     ]
 
     indicators = conn.execute(
-        "SELECT id, unit, source_code, source_run_id FROM mart.indicators ORDER BY id"
+        "SELECT id, unit, source_code, source_run_id FROM mart.indicators"
+        " WHERE source = 'BCB' ORDER BY id"
     ).fetchall()
     assert indicators == [
         ("ipca", "% a.m.", "433", run_id),
@@ -199,12 +200,25 @@ def test_full_refresh_rebuilds_from_all_collections(conn):
     assert run_job(conn, "bcb", job.run)
     # Um valor que não veio de nenhuma coleta (sobra de uma regra antiga, por exemplo).
     conn.execute("INSERT INTO mart.indicator_values VALUES ('usd_brl', '2026-01-02', 9.99)")
+    # Um indicador de outra fonte, que o job do BCB não pode apagar.
+    other_run = conn.execute(
+        "INSERT INTO raw.collection_runs (source, status) VALUES ('teste', 'success') RETURNING id"
+    ).fetchone()[0]
+    conn.execute(
+        """INSERT INTO mart.indicators
+               (id, name, unit, frequency, source, source_code, source_run_id)
+           VALUES ('teste_outra_fonte', 'Teste', 'x', 'daily', 'OUTRA', 'X', %s)""",
+        (other_run,),
+    )
+    conn.execute("INSERT INTO mart.indicator_values VALUES ('teste_outra_fonte', '2026-11-06', 1)")
 
     summary = job.run(conn, full_refresh=True)
 
     # Todas as coletas foram relidas, e a mart foi refeita só com o que veio delas.
     assert summary.runs == 2
     assert dollar(conn) == [(date(2026, 11, 5), "5.4621"), (date(2026, 11, 6), "5.51")]
+    other = "SELECT count(*) FROM mart.indicator_values WHERE indicator_id = 'teste_outra_fonte'"
+    assert count(conn, other) == 1
 
 
 def test_invalid_data_does_not_touch_mart(conn):
@@ -222,7 +236,8 @@ def test_invalid_data_does_not_touch_mart(conn):
 
     # A mart continua com os dados da coleta anterior, intactos.
     assert count(conn, "SELECT count(*) FROM mart.indicator_values") == 5
-    assert count(conn, "SELECT min(source_run_id) FROM mart.indicators") == good_run
+    bcb_run = "SELECT min(source_run_id) FROM mart.indicators WHERE source = 'BCB'"
+    assert count(conn, bcb_run) == good_run
 
 
 def test_big_jump_is_loaded_and_recorded_as_a_warning(conn):

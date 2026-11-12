@@ -61,7 +61,12 @@ def replace_all(
         copy_frame(cur, ("staging", "bcb_sgs_observations"), staging)
 
         _upsert_indicators(cur, run_id)
-        cur.execute("DELETE FROM mart.indicator_values")
+        # Só os indicadores do BCB: a tabela também guarda os de outras
+        # fontes (o Brent, do FRED), que este job não reconstrói.
+        cur.execute(
+            "DELETE FROM mart.indicator_values WHERE indicator_id = ANY(%s)",
+            ([i.id for i in INDICATORS],),
+        )
         copy_frame(cur, ("mart", "indicator_values"), mart_values)
 
         # Depois de trocar a tabela inteira, as estatísticas do planejador

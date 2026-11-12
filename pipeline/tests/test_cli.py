@@ -6,11 +6,12 @@ from radar_pipeline.cli import parse_flag, select_jobs
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
-        (None, ["bcb", "ibge", "anp"]),
-        ("", ["bcb", "ibge", "anp"]),
+        (None, ["bcb", "fred", "ibge", "anp", "anp_serie"]),
+        ("", ["bcb", "fred", "ibge", "anp", "anp_serie"]),
         ("anp", ["anp"]),
         # A ordem é sempre a de dependência (o IBGE antes da ANP), não a pedida.
         ("anp, ibge", ["ibge", "anp"]),
+        ("anp_serie,anp", ["anp", "anp_serie"]),
         ("bcb,bcb", ["bcb"]),
     ],
 )

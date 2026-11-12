@@ -72,6 +72,7 @@ def test_failure_undoes_the_load_and_is_recorded(conn):
     def broken_job(conn):
         conn.execute("DELETE FROM mart.fuel_prices_municipal")
         conn.execute("DELETE FROM mart.fuel_prices_weekly")
+        conn.execute("DELETE FROM mart.fuel_prices_anp_weekly")
         conn.execute("DELETE FROM mart.fuel_products")
         raise RuntimeError("arquivo da ANP com layout novo")
 
