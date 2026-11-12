@@ -30,3 +30,6 @@ next-env.d.ts
 .idea/
 .DS_Store
 Thumbs.db
+
+# Quadros do GIF de demonstração (docs/scripts)
+docs/scripts/frames/

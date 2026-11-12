@@ -1,0 +1,113 @@
+{
+ "width": 1000,
+ "height": 625,
+ "scale": 1,
+ "scheme": "light",
+ "framesDir": "docs/scripts/frames",
+ "steps": [
+  {
+   "goto": "https://radar-economico-phi.vercel.app/"
+  },
+  {
+   "waitFor": "document.querySelectorAll('canvas').length >= 4"
+  },
+  {
+   "wait": 1000
+  },
+  {
+   "frame": 2200
+  },
+  {
+   "scrollTo": "figure"
+  },
+  {
+   "frame": 1800
+  },
+  {
+   "goto": "https://radar-economico-phi.vercel.app/combustiveis"
+  },
+  {
+   "waitFor": "document.querySelectorAll('canvas').length >= 2"
+  },
+  {
+   "wait": 2000
+  },
+  {
+   "frame": 1800
+  },
+  {
+   "scrollToText": "Preço médio por município",
+   "offset": 30
+  },
+  {
+   "wait": 2000
+  },
+  {
+   "frame": 2400
+  },
+  {
+   "goto": "https://radar-economico-phi.vercel.app/analises?combustivel=diesel_s10"
+  },
+  {
+   "waitFor": "document.querySelectorAll('canvas').length >= 4"
+  },
+  {
+   "wait": 1000
+  },
+  {
+   "frame": 2400
+  },
+  {
+   "scrollTo": "figure"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "frame": 2200
+  },
+  {
+   "goto": "https://radar-economico-phi.vercel.app/assistente"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "frame": 1000
+  },
+  {
+   "type": "Qual estado tem o diesel S10 mais caro?",
+   "into": "#question",
+   "frameEvery": 3,
+   "frameMs": 90
+  },
+  {
+   "frame": 600
+  },
+  {
+   "click": "Perguntar"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "frame": 900
+  },
+  {
+   "waitFor": "!!document.querySelector('main figure h2, main section h2') || /limite|indisponível|Não consegui/.test(document.querySelector('main')?.innerText ?? '')"
+  },
+  {
+   "wait": 500
+  },
+  {
+   "scrollToText": "Pergunte aos dados",
+   "offset": -200
+  },
+  {
+   "wait": 600
+  },
+  {
+   "frame": 3500
+  }
+ ]
+}

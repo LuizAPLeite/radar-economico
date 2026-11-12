@@ -1,0 +1,66 @@
+{
+ "width": 1280,
+ "height": 800,
+ "scale": 1,
+ "scheme": "light",
+ "steps": [
+  {
+   "goto": "https://radar-economico-phi.vercel.app/"
+  },
+  {
+   "waitFor": "document.querySelectorAll('canvas').length >= 4"
+  },
+  {
+   "wait": 1500
+  },
+  {
+   "shot": "docs/img/inicio.png",
+   "height": 1050
+  },
+  {
+   "goto": "https://radar-economico-phi.vercel.app/combustiveis"
+  },
+  {
+   "waitFor": "document.querySelectorAll('canvas').length >= 2"
+  },
+  {
+   "wait": 2500
+  },
+  {
+   "shot": "docs/img/combustiveis.png",
+   "height": 1500
+  },
+  {
+   "goto": "https://radar-economico-phi.vercel.app/analises?combustivel=diesel_s10"
+  },
+  {
+   "waitFor": "document.querySelectorAll('canvas').length >= 4"
+  },
+  {
+   "wait": 1500
+  },
+  {
+   "shot": "docs/img/analises.png",
+   "height": 1150
+  },
+  {
+   "goto": "https://radar-economico-phi.vercel.app/assistente"
+  },
+  {
+   "wait": 1000
+  },
+  {
+   "click": "Como o preço médio da gasolina variou"
+  },
+  {
+   "waitFor": "!!document.querySelector('figure canvas')"
+  },
+  {
+   "wait": 1500
+  },
+  {
+   "shot": "docs/img/assistente.png",
+   "height": 1250
+  }
+ ]
+}
