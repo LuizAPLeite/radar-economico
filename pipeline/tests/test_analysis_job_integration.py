@@ -35,6 +35,12 @@ def seed(conn) -> int:
     run_id = conn.execute(
         "INSERT INTO raw.collection_runs (source, status) VALUES ('teste', 'success') RETURNING id"
     ).fetchone()[0]
+    # O banco do CI começa vazio: o teste não pode contar com o que um job já gravou.
+    conn.execute(
+        """INSERT INTO mart.fuel_products (id, name, unit)
+           VALUES ('gasolina', 'Gasolina comum', 'R$/l')
+           ON CONFLICT (id) DO NOTHING"""
+    )
     for indicator, source in (("usd_brl", "BCB"), ("brent", "FRED")):
         conn.execute(
             """INSERT INTO mart.indicators
