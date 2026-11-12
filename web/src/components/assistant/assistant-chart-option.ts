@@ -1,6 +1,6 @@
 import type { EChartsOption } from "echarts";
 
-import { formatDateAs, type ChartData } from "@/lib/assistant";
+import { formatDateAs, withStateName, type ChartData } from "@/lib/assistant";
 import type { ChartColors } from "../chart-option";
 
 const number = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 3 });
@@ -14,7 +14,7 @@ const axisNumber = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
 export function buildAssistantOption(data: ChartData, title: string, colors: ChartColors): EChartsOption {
   const palette = [colors.series, colors.muted];
   const isTime = data.kind === "line" && data.xType === "date";
-  const label = (x: string) => (data.xType === "date" ? formatDateAs(x, data.granularity) : x);
+  const label = (x: string) => (data.xType === "date" ? formatDateAs(x, data.granularity) : withStateName(x));
 
   return {
     animation: false,

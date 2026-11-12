@@ -78,8 +78,11 @@ describe("tabela", () => {
     assert.equal(formatCell(6.473, "number"), "6,473");
     assert.equal(formatCell(1234.5, "number"), "1.234,5");
     assert.equal(formatCell(null, "number"), "—");
-    assert.equal(formatCell("SP", "text"), "SP");
+    assert.equal(formatCell("SP", "text"), "São Paulo (SP)");
     assert.equal(formatCell(true, "text"), "sim");
+    assert.equal(formatCell("RR", "text"), "Roraima (RR)");
+    assert.equal(formatCell("BR", "text"), "BR"); // não é UF
+    assert.equal(formatCell("Rr", "text"), "Rr");
   });
 
   test("rótulo da coluna", () => {

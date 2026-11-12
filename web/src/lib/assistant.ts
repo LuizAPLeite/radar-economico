@@ -3,6 +3,7 @@
  * testadas com `node --test` (ver assistant.test.ts).
  */
 import type { Answer, AnswerColumn } from "./api";
+import { UF_NAMES } from "./fuels.ts";
 import { formatDate, formatMonth } from "./indicators.ts";
 
 /** Mesmos limites da API (assistant.MinQuestionLength / MaxQuestionLength). */
@@ -80,7 +81,12 @@ export function formatCell(
   if (type === "number" && typeof value === "number") return number.format(value);
   if (type === "date" && typeof value === "string") return formatDateAs(value, granularity);
   if (typeof value === "boolean") return value ? "sim" : "não";
-  return String(value);
+  return withStateName(String(value));
+}
+
+/** "RR" → "Roraima (RR)": o banco só tem a sigla da UF. Outros textos passam iguais. */
+export function withStateName(text: string): string {
+  return /^[A-Z]{2}$/.test(text) && text in UF_NAMES ? `${UF_NAMES[text]} (${text})` : text;
 }
 
 /** "preco_medio" → "Preço médio"? Sem acentos não dá para adivinhar: só troca _ e capitaliza. */
