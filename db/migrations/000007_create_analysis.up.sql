@@ -74,6 +74,7 @@ CREATE TABLE mart.analysis_rolling_correlations (
 CREATE TABLE mart.fuel_forecasts (
     product_id    text    NOT NULL REFERENCES mart.fuel_products (id),
     week_start    date    NOT NULL CHECK (extract(isodow FROM week_start) = 1),
+    model         text    NOT NULL CHECK (model <> ''), -- o de menor erro no backtest
     base_week     date    NOT NULL CHECK (base_week < week_start),
     horizon_weeks integer NOT NULL CHECK (horizon_weeks > 0),
     predicted     numeric NOT NULL,

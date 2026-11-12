@@ -94,7 +94,9 @@ def run(conn: psycopg.Connection, *, full_refresh: bool = False) -> Summary | No
             warnings.append(f"{product}: série curta demais para prever")
             continue
         forecast_frames.append(
-            result.forecasts.with_columns(tag, base_week=pl.lit(result.base_week))
+            result.forecasts.with_columns(
+                tag, model=pl.lit(result.model), base_week=pl.lit(result.base_week)
+            )
         )
         backtest_frames.append(result.backtests.with_columns(tag))
         _log_product(product, best, result)
@@ -188,6 +190,7 @@ def _write(
             [
                 "product_id",
                 "week_start",
+                "model",
                 "base_week",
                 "horizon_weeks",
                 "predicted",
