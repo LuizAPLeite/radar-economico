@@ -238,6 +238,35 @@ Qualidade e clareza importam mais que quantidade de features.
 - O usuário roda os comandos de teste no PowerShell 5.1: usar `curl.exe` com
   `http://`.
 
+- Fase 5 (nov/2026). Assistente em `api/internal/assistant`: `Planner`
+  (interface do provedor; `GeminiPlanner` por HTTP puro na API Interactions,
+  `POST /v1beta/interactions`, `Api-Revision: 2026-05-20`, `store: false`,
+  saída estruturada em `response_format`, chave só no cabeçalho
+  `x-goog-api-key`), `CheckSQL` (um SELECT/WITH, sem `;` nem comentários),
+  `PgExecutor` (transação READ ONLY + `SET LOCAL ROLE radar_assistant` +
+  `statement_timeout` 3 s + subconsulta com LIMIT 501), `Service` (pergunta
+  de 3 a 300 caracteres, cache de 24 h por pergunta normalizada, limite
+  diário em memória com virada em Brasília, `checkChart`). Uma chamada ao LLM
+  por pergunta. Rota `POST /v1/ask` (via `httpapi.WithAssistant`, functional
+  option); erros invalid_body/invalid_question 400, unanswerable 422,
+  assistant_limit 429, assistant_unavailable 502, assistant_disabled 503.
+  `WriteTimeout` do servidor: 60 s.
+- Papel `radar_assistant` (migration 000008): NOLOGIN, SELECT em tabelas da
+  mart listadas uma a uma (nunca `pipeline_runs`, `raw`, `staging`);
+  `GRANT ... TO CURRENT_USER WITH INHERIT FALSE, SET TRUE`. Criação
+  idempotente (papel é do servidor inteiro); o down revoga uma a uma, porque
+  `DROP OWNED` exigiria herdar o papel. Testado como não-superusuário (o
+  `neondb_owner` do Neon tem CREATEROLE, não é superusuário).
+- Gemini no plano grátis do projeto `radar-economico-1236` (sem faturamento):
+  `gemini-3.5-flash-lite` (15/min, 500/dia, conferido em 12/11/2026); o
+  `gemini-3.8-flash` (5/min, 20/dia) não respondia. `GEMINI_MODEL`,
+  `ASSISTANT_DAILY_LIMIT` (padrão 400). Chave no `.env` e no Render; nunca no
+  chat nem no repositório (o usuário cria e cola; eu só confiro o tamanho).
+- Web `/assistente`: página estática; Server Action (`app/assistente/actions.ts`,
+  `useActionState`) chama a API; datas formatadas pela granularidade (ano,
+  mês, dia); série noutra escala (razão > 5) fica fora do gráfico, com aviso;
+  legenda sempre; no máximo 2 séries. Menu com `flex-wrap` (5 links).
+
 ## Regra de arquitetura
 Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
 (raw → staging → mart). A API só lê `mart`.
@@ -253,6 +282,7 @@ Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
 - Fase 4: análises (previsão de preços, correlação dólar × gasolina).
   Concluída (nov/2026).
 - Fase 5: assistente com LLM (pergunta em português → SQL → resposta + gráfico).
+  Concluída (nov/2026).
 - Fase 6: README caprichado, diagrama, GIF de demo.
 Não avançar de fase sem a anterior estar funcionando.
 

@@ -26,3 +26,13 @@ services:
         sync: false # segredo: informado no painel, nunca no repositório
       - key: CACHE_TTL
         value: 30m
+      # Assistente (POST /v1/ask). A chave do Gemini é segredo: informada no
+      # painel do Render; sem ela, o assistente fica desligado (503).
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash-lite
+      # Abaixo das 500 perguntas por dia do plano grátis (respostas
+      # guardadas no cache não contam).
+      - key: ASSISTANT_DAILY_LIMIT
+        value: "400"

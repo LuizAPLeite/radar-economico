@@ -1,7 +1,8 @@
 # Radar Econômico
 
 Coleta dados públicos (Banco Central, IBGE, ANP e o petróleo Brent no FRED),
-processa em camadas e exibe num dashboard web com gráficos, mapa e análises.
+processa em camadas e exibe num dashboard web com gráficos, mapa, análises e
+um assistente que responde perguntas em português escrevendo o SQL.
 
 > **No ar: [radar-economico-phi.vercel.app](https://radar-economico-phi.vercel.app)**
 > (API em [radar-economico-api.onrender.com](https://radar-economico-api.onrender.com/health/data)).
@@ -13,7 +14,9 @@ processa em camadas e exibe num dashboard web com gráficos, mapa e análises.
 > incrementais, saúde dos dados, testes de contrato, coleta agendada e um
 > canário diário contra as fontes reais. A **Fase 4**, as análises, também:
 > quanto o preço na bomba acompanha o petróleo e o dólar desde 2004, e a
-> previsão das próximas semanas testada contra o passado.
+> previsão das próximas semanas testada contra o passado. E a **Fase 5**, o
+> assistente: pergunta em português → SQL escrito por um LLM (Gemini) →
+> resposta com gráfico, tabela e o SQL usado, com quatro camadas de proteção.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/combustiveis-escuro.png">
@@ -33,7 +36,7 @@ A API só lê o schema `mart`.
 |---|---|---|
 | `collector/` | Go | Coleta concorrente das fontes, grava em `raw` |
 | `pipeline/` | Python, polars, pandera | Limpa e valida `raw` → `staging` → `mart` |
-| `api/` | Go | API REST somente leitura sobre `mart` |
+| `api/` | Go | API REST somente leitura sobre `mart`, e o assistente (LLM → SQL) |
 | `web/` | Next.js, TypeScript, Tailwind, ECharts, MapLibre | Dashboard com gráficos e mapa |
 | `db/migrations/` | SQL (golang-migrate) | Schemas e tabelas |
 
@@ -143,7 +146,7 @@ npm --prefix web run dev                # web fora do Docker, em http://localhos
 
 ## Dashboard
 
-Next.js 16 (App Router, Cache Components) em http://localhost:3000, com três
+Next.js 16 (App Router, Cache Components) em http://localhost:3000, com quatro
 páginas, tema claro e escuro, e funcionando no celular.
 
 **Indicadores** (`/`):
@@ -184,6 +187,10 @@ da política de preços, por semanas de defasagem e em janela móvel, e a
 previsão das próximas 8 semanas com a faixa de 80% e o erro de cada modelo
 no teste com o passado. Cada gráfico tem legenda, rótulos diretos e tabela.
 
+**Assistente** (`/assistente`): uma caixa de pergunta em português, com
+cinco perguntas de exemplo; a resposta vem com título, explicação, gráfico
+(linha ou barras), tabela e o SQL usado. Ver [Assistente](#assistente).
+
 O mapa não depende de nenhum serviço de mapas: o fundo é o contorno dos
 estados, gerado a partir da malha do IBGE por `web/scripts/build-ufs-geojson.mjs`
 e guardado em `web/public/geo/ufs.json`. O worker do MapLibre é copiado de
@@ -198,7 +205,8 @@ página como HTML estático e **não precisa da API no ar**.
 
 ## API
 
-Somente leitura, sobre o schema `mart`. A especificação completa (OpenAPI 3.1)
+Somente leitura sobre o schema `mart` (o `POST /v1/ask` recebe a pergunta no
+corpo, mas também não grava nada). A especificação completa (OpenAPI 3.1)
 fica em [`api/openapi.yaml`](api/openapi.yaml) e é servida em `/openapi.yaml`.
 
 | Rota | O que devolve |
@@ -210,6 +218,7 @@ fica em [`api/openapi.yaml`](api/openapi.yaml) e é servida em `/openapi.yaml`.
 | `GET /v1/fuels` | Combustíveis (`gasolina`, `etanol`, `diesel_s10`...) com a média nacional da última semana |
 | `GET /v1/fuels/{id}/prices?scope=BR\|UF&from=&to=` | Média semanal no Brasil (padrão) ou numa UF |
 | `GET /v1/fuels/{id}/municipalities?month=AAAA-MM` | Preço em cada município pesquisado, com coordenadas (mapa); sem `month`, o mais recente |
+| `POST /v1/ask` | Corpo `{"question": "..."}`: a resposta do assistente (dados, SQL e sugestão de gráfico). Ver [Assistente](#assistente) |
 | `GET /v1/fuels/{id}/pass-through` | Correlação do preço com o dólar e o Brent, por período da política de preços e defasagem, e a correlação móvel |
 | `GET /v1/fuels/{id}/forecast` | Previsão de 1 a 8 semanas com intervalo de 80%, o erro de cada modelo no backtest e as últimas 104 semanas da série oficial |
 
@@ -284,6 +293,47 @@ erra de 19% a 47% a mais): a bomba segue o petróleo, mas os reajustes vêm em
 degraus e em datas que ninguém sabe antes. Uma variação com o "atraso" da
 bomba em relação ao petróleo também foi testada, e errou mais.
 
+## Assistente
+
+Pergunta em português → um modelo de linguagem escreve o SQL → a API confere,
+executa e devolve os dados (`api/internal/assistant`).
+
+```
+pergunta ─► Server Action (Next) ─► POST /v1/ask ─► Gemini: SQL + título + gráfico
+                                        │
+                                        └─► CheckSQL ─► Postgres (papel restrito) ─► dados
+```
+
+- **Modelo:** Gemini 3.5 Flash-Lite, no plano grátis (sem cartão): 500 perguntas
+  por dia e 15 por minuto. O 3.8 Flash ficou sem responder no plano grátis
+  durante os testes. O provedor fica atrás da interface `Planner`: trocar de
+  modelo (ou de empresa) não muda o resto. A chamada é HTTP puro, com saída
+  estruturada (o modelo devolve um JSON num esquema fixo) e `store: false`.
+- **Uma chamada por pergunta:** o modelo devolve o SQL, o título, a explicação
+  e o tipo de gráfico de uma vez; os números saem do banco, não do modelo.
+- **Quatro camadas de proteção** para o SQL escrito pelo modelo:
+  1. o prompt descreve só as tabelas públicas e manda ignorar instruções
+     dentro da pergunta;
+  2. `CheckSQL` aceita um único `SELECT`/`WITH`, sem comentários;
+  3. a consulta roda no papel `radar_assistant` (migration 000008), que só lê
+     tabelas da mart listadas uma a uma (sem `raw`, `staging` nem o registro de
+     execuções), dentro de `SET LOCAL ROLE`;
+  4. transação somente leitura, `statement_timeout` de 3 s e até 500 linhas.
+- **Cota:** respostas guardadas por 24 h (perguntas iguais, ignorando maiúsculas
+  e espaços, não gastam cota) e um limite de perguntas novas por dia
+  (`ASSISTANT_DAILY_LIMIT`, padrão 400). Acabou a cota, a página explica e
+  as perguntas de exemplo continuam respondendo do cache.
+- **Gráfico conferido:** a sugestão do modelo só vale se as colunas existirem e
+  os tipos baterem; uma série noutra escala fica só na tabela (um eixo só).
+
+Para usar localmente, crie uma chave em [aistudio.google.com](https://aistudio.google.com)
+(Get API key; sem ativar faturamento) e ponha no `.env` como `GEMINI_API_KEY`.
+Sem a chave, o resto do site funciona e o assistente responde que está desligado.
+
+```powershell
+curl.exe -X POST http://localhost:8080/v1/ask -H "Content-Type: application/json" -d '{\"question\": \"Qual estado tem a gasolina mais cara hoje?\"}'
+```
+
 ## Deploy
 
 Tudo em planos gratuitos, sem cartão de crédito.
@@ -308,8 +358,8 @@ GitHub atrasa agendamentos curtos: em dois dias, o "a cada 10 min" rodou
 
 Segredos nunca entram no código: `DATABASE_URL` (connection string **direta**
 do Neon, sem `-pooler`, com `sslmode=require`) fica nos secrets do GitHub e
-no painel do Render. `API_URL` (endereço da API no Render) fica nas variáveis
-da Vercel.
+no painel do Render. `GEMINI_API_KEY` fica só no painel do Render (e no `.env`
+local). `API_URL` (endereço da API no Render) fica nas variáveis da Vercel.
 
 A coleta agendada não alcança o IBGE (ver o canário, abaixo). Os municípios
 quase nunca mudam: carregue-os uma vez, e quando o IBGE criar um município
