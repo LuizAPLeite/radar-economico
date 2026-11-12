@@ -24,6 +24,7 @@ import (
 type Store interface {
 	IndicatorStore
 	FuelStore
+	AnalysisStore
 	HealthStore
 }
 

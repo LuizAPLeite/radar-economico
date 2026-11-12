@@ -91,6 +91,39 @@ func (f *countingStore) ListFuelPricesMunicipal(_ context.Context, p db.ListFuel
 	return []db.ListFuelPricesMunicipalRow{{Name: "Barreiras", AvgPrice: 6.89}}, nil
 }
 
+func (f *countingStore) ListAnalysisRegimes(context.Context) ([]db.MartAnalysisRegime, error) {
+	f.count("ListAnalysisRegimes")
+	return []db.MartAnalysisRegime{{ID: "atual"}}, nil
+}
+
+func (f *countingStore) ListLagCorrelations(context.Context, string) ([]db.ListLagCorrelationsRow, error) {
+	f.count("ListLagCorrelations")
+	return []db.ListLagCorrelationsRow{{Driver: "brent_brl", Correlation: 0.41}}, nil
+}
+
+func (f *countingStore) ListRollingCorrelations(context.Context, string) ([]db.ListRollingCorrelationsRow, error) {
+	f.count("ListRollingCorrelations")
+	return nil, nil
+}
+
+func (f *countingStore) ListFuelForecasts(context.Context, string) ([]db.ListFuelForecastsRow, error) {
+	f.count("ListFuelForecasts")
+	return nil, nil
+}
+
+func (f *countingStore) ListForecastBacktests(context.Context, string) ([]db.ListForecastBacktestsRow, error) {
+	f.count("ListForecastBacktests")
+	return nil, nil
+}
+
+func (f *countingStore) ListOfficialFuelPrices(_ context.Context, p db.ListOfficialFuelPricesParams) ([]db.ListOfficialFuelPricesRow, error) {
+	f.count("ListOfficialFuelPrices")
+	return []db.ListOfficialFuelPricesRow{
+		{WeekStart: day(2026, 10, 19), AvgPrice: 6.47},
+		{WeekStart: day(2026, 10, 26), AvgPrice: 6.47},
+	}, nil
+}
+
 func (f *countingStore) ListDatasetFreshness(context.Context) ([]db.ListDatasetFreshnessRow, error) {
 	f.count("ListDatasetFreshness")
 	return []db.ListDatasetFreshnessRow{{Dataset: "selic", Latest: day(2026, 11, 8)}}, nil
@@ -132,6 +165,36 @@ func TestRepeatedCallsGoToTheStoreOnce(t *testing.T) {
 	for _, method := range []string{"ListIndicators", "GetFuelProduct", "ListFuelMonths", "ListDatasetFreshness"} {
 		if n := inner.callsTo(method); n != 1 {
 			t.Errorf("%s chamado %d vezes, quer 1", method, n)
+		}
+	}
+}
+
+func TestAnalysesAreCachedPerProduct(t *testing.T) {
+	inner := newCountingStore()
+	s := New(inner, time.Minute)
+
+	for _, product := range []string{"gasolina", "gasolina", "etanol"} {
+		if _, err := s.ListLagCorrelations(ctx, product); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.ListAnalysisRegimes(ctx); err != nil {
+			t.Fatal(err)
+		}
+		// A série oficial é guardada inteira e recortada em memória.
+		rows, err := s.ListOfficialFuelPrices(ctx, db.ListOfficialFuelPricesParams{
+			ProductID: product, FromDate: day(2026, 10, 26), ToDate: httpapi.MaxDate,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 {
+			t.Errorf("%s: %d semanas no recorte, quer 1", product, len(rows))
+		}
+	}
+	want := map[string]int{"ListLagCorrelations": 2, "ListAnalysisRegimes": 1, "ListOfficialFuelPrices": 2}
+	for method, n := range want {
+		if got := inner.callsTo(method); got != n {
+			t.Errorf("%s chamado %d vezes, quer %d", method, got, n)
 		}
 	}
 }

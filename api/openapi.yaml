@@ -5,7 +5,8 @@ info:
   description: |
     API REST somente leitura com indicadores econômicos do Brasil.
 
-    Os dados vêm do Banco Central (API SGS), passam pelo pipeline
+    Os dados vêm do Banco Central (API SGS), da ANP (preços de combustíveis),
+    do IBGE (municípios) e do FRED (petróleo Brent), passam pelo pipeline
     raw → staging → mart e são servidos a partir do schema `mart`.
     Todas as respostas de erro seguem o formato `Error`.
 servers:
@@ -291,6 +292,97 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /v1/fuels/{id}/pass-through:
+    get:
+      operationId: getFuelPassThrough
+      summary: Quanto o preço na bomba acompanha o dólar e o petróleo
+      description: |
+        Correlação entre a variação em 4 semanas do preço médio no Brasil
+        (série oficial da ANP) e a variação, `lag_weeks` semanas antes, de
+        cada fator: dólar (`usd_brl`), Brent em US$ (`brent_usd`) e Brent em
+        reais (`brent_brl`). Separada pelos períodos da política de preços
+        da Petrobras (`regimes`), com a correlação móvel de 52 semanas na
+        defasagem de maior correlação do período atual. Calculada pelo
+        pipeline (job `analysis`).
+      parameters:
+        - $ref: "#/components/parameters/FuelID"
+      responses:
+        "200":
+          description: Correlações por período e defasagem, e a correlação móvel
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [fuel, regimes, lags, rolling]
+                properties:
+                  fuel:
+                    $ref: "#/components/schemas/Fuel"
+                  regimes:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Regime"
+                  lags:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LagCorrelation"
+                  rolling:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RollingCorrelation"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/fuels/{id}/forecast:
+    get:
+      operationId: getFuelForecast
+      summary: Previsão do preço médio no Brasil para as próximas semanas
+      description: |
+        Previsão de 1 a 8 semanas à frente com intervalo de 80%, feita pelo
+        modelo de menor erro no teste com as últimas 104 semanas
+        (`backtests`): `naive` (o preço fica igual) ou `brent` (regressão
+        sobre a variação recente do Brent em reais). `history` traz as
+        últimas 104 semanas da série oficial da ANP. Sem previsão calculada,
+        `model` e `base_week` são null e as listas vêm vazias.
+      parameters:
+        - $ref: "#/components/parameters/FuelID"
+      responses:
+        "200":
+          description: Previsão, histórico recente e erro dos modelos
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [fuel, model, base_week, history, forecasts, backtests]
+                properties:
+                  fuel:
+                    $ref: "#/components/schemas/Fuel"
+                  model:
+                    type: [string, "null"]
+                    description: Modelo publicado
+                    examples: [naive]
+                  base_week:
+                    type: [string, "null"]
+                    format: date
+                    description: Última semana observada quando a previsão foi feita
+                  history:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/WeekPrice"
+                  forecasts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ForecastPoint"
+                  backtests:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Backtest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
 components:
   parameters:
     FuelID:
@@ -420,6 +512,102 @@ components:
         n_stations:
           type: integer
           description: Postos pesquisados no mês
+
+    Regime:
+      type: object
+      required: [id, name, starts_on, ends_on, description]
+      properties:
+        id:
+          type: string
+          examples: [ppi]
+        name:
+          type: string
+          examples: [Paridade internacional (2016–2023)]
+        starts_on:
+          type: string
+          format: date
+        ends_on:
+          type: [string, "null"]
+          format: date
+          description: Fim (exclusivo); null no período atual
+        description:
+          type: string
+
+    LagCorrelation:
+      type: object
+      required: [driver, regime_id, lag_weeks, correlation, n_weeks]
+      properties:
+        driver:
+          type: string
+          enum: [usd_brl, brent_usd, brent_brl]
+        regime_id:
+          type: string
+        lag_weeks:
+          type: integer
+          minimum: 0
+          description: Semanas entre a variação do fator e a do preço
+        correlation:
+          type: number
+          minimum: -1
+          maximum: 1
+        n_weeks:
+          type: integer
+          description: Pares de semanas usados no cálculo
+
+    RollingCorrelation:
+      type: object
+      required: [driver, week_start, lag_weeks, correlation]
+      properties:
+        driver:
+          type: string
+          enum: [usd_brl, brent_usd, brent_brl]
+        week_start:
+          type: string
+          format: date
+          description: Última semana da janela de 52 semanas
+        lag_weeks:
+          type: integer
+          minimum: 0
+        correlation:
+          type: number
+          minimum: -1
+          maximum: 1
+
+    ForecastPoint:
+      type: object
+      required: [week_start, horizon_weeks, predicted, lower_80, upper_80]
+      properties:
+        week_start:
+          type: string
+          format: date
+        horizon_weeks:
+          type: integer
+          minimum: 1
+        predicted:
+          type: number
+        lower_80:
+          type: number
+        upper_80:
+          type: number
+
+    Backtest:
+      type: object
+      required: [model, horizon_weeks, mae, mape, n_forecasts]
+      properties:
+        model:
+          type: string
+          examples: [naive]
+        horizon_weeks:
+          type: integer
+          minimum: 1
+        mae:
+          type: number
+          description: Erro absoluto médio, na unidade do combustível (R$)
+        mape:
+          type: number
+          description: Erro percentual médio (%)
+        n_forecasts:
+          type: integer
 
     HealthReport:
       type: object

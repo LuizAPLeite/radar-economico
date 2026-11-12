@@ -16,10 +16,8 @@ func d(y int, m time.Month, day int) time.Time { return time.Date(y, m, day, 0, 
 // lugar dos reais (só dentro da transação, que sofre rollback no fim).
 func TestFuelQueries(t *testing.T) {
 	ctx, tx := beginTestTx(t)
+	mustExec(t, ctx, tx, deleteFuelData...)
 	mustExec(t, ctx, tx,
-		`DELETE FROM mart.fuel_prices_municipal`,
-		`DELETE FROM mart.fuel_prices_weekly`,
-		`DELETE FROM mart.fuel_products`,
 		`INSERT INTO mart.fuel_products (id, name, unit, updated_at) VALUES
 		   ('gasolina', 'Gasolina comum', 'R$/l', '2026-11-07 19:00:00+00'),
 		   ('gnv', 'Gás natural veicular', 'R$/m³', '2026-11-07 19:00:00+00')`,

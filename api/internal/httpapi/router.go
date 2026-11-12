@@ -40,6 +40,8 @@ func NewRouter(store Store, logger *slog.Logger, openAPISpec []byte) http.Handle
 		r.Get("/fuels", h.listFuels)
 		r.Get("/fuels/{id}/prices", h.listFuelPrices)
 		r.Get("/fuels/{id}/municipalities", h.listFuelMunicipalities)
+		r.Get("/fuels/{id}/pass-through", h.getPassThrough)
+		r.Get("/fuels/{id}/forecast", h.getForecast)
 	})
 	return r
 }

@@ -6,7 +6,17 @@ package db
 
 import (
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type MartAnalysisRegime struct {
+	ID          string
+	Name        string
+	StartsOn    time.Time
+	EndsOn      pgtype.Date
+	Description string
+}
 
 type MartFuelProduct struct {
 	ID        string

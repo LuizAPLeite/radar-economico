@@ -36,6 +36,12 @@ type Store struct {
 	weekly     *cache.Cache[[]db.ListFuelPricesWeeklyRow]
 	months     *cache.Cache[[]time.Time]
 	municipal  *cache.Cache[[]db.ListFuelPricesMunicipalRow]
+	regimes    *cache.Cache[[]db.MartAnalysisRegime]
+	lags       *cache.Cache[[]db.ListLagCorrelationsRow]
+	rolling    *cache.Cache[[]db.ListRollingCorrelationsRow]
+	forecasts  *cache.Cache[[]db.ListFuelForecastsRow]
+	backtests  *cache.Cache[[]db.ListForecastBacktestsRow]
+	official   *cache.Cache[[]db.ListOfficialFuelPricesRow]
 	freshness  *cache.Cache[[]db.ListDatasetFreshnessRow]
 	lastRuns   *cache.Cache[[]db.ListLastRunsRow]
 	lastOK     *cache.Cache[[]db.ListLastSuccessfulRunsRow]
@@ -58,6 +64,12 @@ func New(next httpapi.Store, ttl time.Duration) *Store {
 		weekly:     cache.New[[]db.ListFuelPricesWeeklyRow](ttl),
 		months:     cache.New[[]time.Time](ttl),
 		municipal:  cache.New[[]db.ListFuelPricesMunicipalRow](ttl),
+		regimes:    cache.New[[]db.MartAnalysisRegime](ttl),
+		lags:       cache.New[[]db.ListLagCorrelationsRow](ttl),
+		rolling:    cache.New[[]db.ListRollingCorrelationsRow](ttl),
+		forecasts:  cache.New[[]db.ListFuelForecastsRow](ttl),
+		backtests:  cache.New[[]db.ListForecastBacktestsRow](ttl),
+		official:   cache.New[[]db.ListOfficialFuelPricesRow](ttl),
 		freshness:  cache.New[[]db.ListDatasetFreshnessRow](ttl),
 		lastRuns:   cache.New[[]db.ListLastRunsRow](ttl),
 		lastOK:     cache.New[[]db.ListLastSuccessfulRunsRow](ttl),
@@ -128,6 +140,50 @@ func (s *Store) ListFuelPricesMunicipal(ctx context.Context, arg db.ListFuelPric
 	return cachedRows(s.municipal, key, func() ([]db.ListFuelPricesMunicipalRow, error) {
 		return s.next.ListFuelPricesMunicipal(ctx, arg)
 	})
+}
+
+// --- Análises -------------------------------------------------------------------
+
+func (s *Store) ListAnalysisRegimes(ctx context.Context) ([]db.MartAnalysisRegime, error) {
+	return cachedRows(s.regimes, "", func() ([]db.MartAnalysisRegime, error) {
+		return s.next.ListAnalysisRegimes(ctx)
+	})
+}
+
+func (s *Store) ListLagCorrelations(ctx context.Context, productID string) ([]db.ListLagCorrelationsRow, error) {
+	return cachedRows(s.lags, productID, func() ([]db.ListLagCorrelationsRow, error) {
+		return s.next.ListLagCorrelations(ctx, productID)
+	})
+}
+
+func (s *Store) ListRollingCorrelations(ctx context.Context, productID string) ([]db.ListRollingCorrelationsRow, error) {
+	return cachedRows(s.rolling, productID, func() ([]db.ListRollingCorrelationsRow, error) {
+		return s.next.ListRollingCorrelations(ctx, productID)
+	})
+}
+
+func (s *Store) ListFuelForecasts(ctx context.Context, productID string) ([]db.ListFuelForecastsRow, error) {
+	return cachedRows(s.forecasts, productID, func() ([]db.ListFuelForecastsRow, error) {
+		return s.next.ListFuelForecasts(ctx, productID)
+	})
+}
+
+func (s *Store) ListForecastBacktests(ctx context.Context, productID string) ([]db.ListForecastBacktestsRow, error) {
+	return cachedRows(s.backtests, productID, func() ([]db.ListForecastBacktestsRow, error) {
+		return s.next.ListForecastBacktests(ctx, productID)
+	})
+}
+
+func (s *Store) ListOfficialFuelPrices(ctx context.Context, arg db.ListOfficialFuelPricesParams) ([]db.ListOfficialFuelPricesRow, error) {
+	all, err := cached(s.official, arg.ProductID, func() ([]db.ListOfficialFuelPricesRow, error) {
+		return s.next.ListOfficialFuelPrices(ctx, db.ListOfficialFuelPricesParams{
+			ProductID: arg.ProductID, FromDate: httpapi.MinDate, ToDate: httpapi.MaxDate,
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return between(all, arg.FromDate, arg.ToDate, func(r db.ListOfficialFuelPricesRow) time.Time { return r.WeekStart }), nil
 }
 
 // --- Saúde dos dados ------------------------------------------------------------

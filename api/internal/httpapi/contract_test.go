@@ -14,6 +14,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers/legacy"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/LuizAPLeite/radar-economico/api/internal/db"
@@ -49,6 +50,12 @@ func TestResponsesMatchTheOpenAPISpec(t *testing.T) {
 	broken.listErr = errors.New("conexão recusada")
 	stale := contractStore()
 	stale.freshness = freshData[:1] // faltam conjuntos: 503
+	unknownFuel := contractStore()
+	unknownFuel.fuelErr = pgx.ErrNoRows
+	noAnalysis := contractStore()
+	noAnalysis.fakeAnalysisStore = fakeAnalysisStore{}
+	brokenAnalysis := contractStore()
+	brokenAnalysis.analysisErr = errors.New("conexão recusada")
 
 	cases := []struct {
 		name       string
@@ -68,6 +75,11 @@ func TestResponsesMatchTheOpenAPISpec(t *testing.T) {
 		{"preço semanal com UF inválida", healthy, "/v1/fuels/gasolina/prices?scope=XX", 400},
 		{"municípios", healthy, "/v1/fuels/gasolina/municipalities", 200},
 		{"municípios num mês sem dados", healthy, "/v1/fuels/gasolina/municipalities?month=2025-01", 200},
+		{"repasse para a bomba", healthy, "/v1/fuels/gasolina/pass-through", 200},
+		{"repasse de combustível inexistente", unknownFuel, "/v1/fuels/querosene/pass-through", 404},
+		{"previsão", healthy, "/v1/fuels/gasolina/forecast", 200},
+		{"previsão ainda não calculada", noAnalysis, "/v1/fuels/gasolina/forecast", 200},
+		{"previsão com erro no banco", brokenAnalysis, "/v1/fuels/gasolina/forecast", 500},
 	}
 
 	for _, tc := range cases {
@@ -118,6 +130,7 @@ func contractStore() *fakeStore {
 				AvgPrice: 6.89, MinPrice: 6.79, MaxPrice: 7.09, NStations: 9,
 			}},
 		},
+		fakeAnalysisStore: sampleAnalyses,
 		fakeHealthStore: fakeHealthStore{
 			freshness: freshData,
 			lastRuns: []db.ListLastRunsRow{
