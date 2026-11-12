@@ -16,4 +16,14 @@ REVOKE SELECT ON
     mart.forecast_backtests
 FROM radar_assistant;
 REVOKE USAGE ON SCHEMA mart FROM radar_assistant;
-DROP ROLE radar_assistant;
+
+-- O papel é do servidor inteiro: se outro banco do mesmo servidor ainda o
+-- usa (o de desenvolvimento, quando se testa num banco à parte), ele fica, e
+-- este banco já está limpo com os REVOKE acima.
+DO $$
+BEGIN
+    DROP ROLE IF EXISTS radar_assistant;
+EXCEPTION WHEN dependent_objects_still_exist THEN
+    RAISE NOTICE 'radar_assistant ainda é usado por outro banco; o papel fica';
+END
+$$;
