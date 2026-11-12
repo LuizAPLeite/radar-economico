@@ -75,11 +75,15 @@ Qualidade e clareza importam mais que quantidade de features.
   `/v1/indicators/{id}/values?from&to`,
   `/v1/fuels`, `/v1/fuels/{id}/prices?scope&from&to` (scope `BR` ou UF),
   `/v1/fuels/{id}/municipalities?month=AAAA-MM` (padrão: mês mais recente;
-  traz `available_months`), `/openapi.yaml` (spec embutida com go:embed).
+  traz `available_months`), `/v1/fuels/{id}/pass-through` (períodos,
+  correlações por defasagem e móvel), `/v1/fuels/{id}/forecast` (modelo,
+  base_week, previsão com faixa de 80%, backtests e as últimas 104 semanas da
+  série oficial; null/vazio sem previsão), `/openapi.yaml` (spec embutida com
+  go:embed).
   Erros sempre `{"error":{"code","message"}}`; 500 nunca expõe o erro interno.
 - `/health/data`: idade do dado mais recente de cada conjunto (selic, usd_brl,
-  ipca, fuels) contra o prazo da fonte (5, 5, 75 e 60 dias, no horário de
-  Brasília; tzdata embutido), última execução de cada job e avisos da última
+  ipca, fuels, brent, fuels_series) contra o prazo da fonte (5, 5, 75, 60, 15
+  e 21 dias, no horário de Brasília; tzdata embutido), última execução de cada job e avisos da última
   carga (que um skipped não esconde). 200 se tudo em dia; 503 se algo
   atrasou, está vazio ou o último job falhou. Leituras pelo cache;
   `Cache-Control: no-store`; a mensagem de erro do job não sai.
@@ -88,8 +92,10 @@ Qualidade e clareza importam mais que quantidade de features.
   resposta das rotas, de sucesso e de erro (400, 500, 503), contra ela. Rota
   nova = caso novo na tabela do teste.
 - `httpapi.Store` embute uma interface por recurso (`IndicatorStore`,
-  `FuelStore`, `HealthStore`); nos testes, `fakeStore` embute
-  `fakeFuelStore` e `fakeHealthStore`.
+  `FuelStore`, `AnalysisStore`, `HealthStore`); nos testes, `fakeStore`
+  embute `fakeFuelStore`, `fakeAnalysisStore` e `fakeHealthStore`. Testes
+  que apagam `mart.fuel_products` precisam apagar antes as tabelas que a
+  referenciam (série oficial e análises): ver `deleteFuelData`.
 - Cache em memória na API: `internal/cache` (TTL + mutex, genérico; escrito
   pelo usuário) e `internal/cachedstore`, um decorator de `httpapi.Store`.
   Séries guardadas inteiras por chave e recortadas por período em memória;
@@ -134,15 +140,17 @@ Qualidade e clareza importam mais que quantidade de features.
   Render; `API_URL` na Vercel (a variável `API_URL` do repositório sobrou
   sem uso). Coleta em produção pelo `data.yml`: diária às 9h
   de Brasília (variável `COLETA_AGENDADA=true`, ligada), ou manual; o
-  pipeline roda mesmo se uma fonte falhar. Coleta só BCB e ANP.
+  pipeline roda mesmo se uma fonte falhar. Coleta BCB, ANP, série da ANP e
+  FRED (o IBGE não).
 - O IBGE recusa conexões vindas de fora do Brasil (o Actions roda nos EUA:
   dial tcp timeout). Municípios em produção: carregar a partir de uma máquina
   no Brasil (comando no README, Deploy); mudam quase nunca.
 - Canário `fontes.yml`: diário às 7h30, também roda quando o próprio arquivo
-  muda. Postgres temporário, coleta real de BCB e ANP (só 2 meses), municípios
-  do retrato `.github/canario/municipios.csv.gz` (comando para regerar no
-  workflow), pipeline `bcb,anp` e API com `CACHE_TTL=0`; falha se
-  `/health/data` não der 200. Erros do coletor viram anotações; o JSON da
+  muda. Postgres temporário, coleta real de BCB, ANP (só 2 meses), série da
+  ANP e FRED, municípios do retrato `.github/canario/municipios.csv.gz`
+  (comando para regerar no workflow), pipeline `bcb,fred,anp,anp_serie,analysis`
+  e API com `CACHE_TTL=0`; falha se `/health/data` não der 200 ou se a
+  previsão da gasolina não tiver 8 semanas. Erros do coletor viram anotações; o JSON da
   saúde vai para o resumo. Não cobre mudanças de formato do IBGE.
 - Neon: usar a connection string DIRETA (sem `-pooler`): o pooler recusa o
   parâmetro `default_transaction_read_only` que a API envia ao conectar.
@@ -151,7 +159,7 @@ Qualidade e clareza importam mais que quantidade de features.
 - Plano grátis do Neon tem 100 CU-horas/mês: por isso a API guarda as
   respostas em memória (ver o cache acima) e não acorda o banco a cada visita.
 
-- Collector com várias fontes (`bcb_sgs`, `ibge`, `anp`) em goroutines, cada
+- Collector com várias fontes (`bcb_sgs`, `ibge`, `anp`, `anp_serie`, `fred`) em goroutines, cada
   uma com sua linha em `raw.collection_runs`; `COLLECTOR_SOURCES` escolhe
   quais rodar. Pacote `fetch` (GET com retry/backoff) compartilhado.
 - IBGE (`raw.ibge_responses`) e ANP (`raw.anp_files`) só gravam quando o
@@ -162,9 +170,10 @@ Qualidade e clareza importam mais que quantidade de features.
   recusa HEAD (403) e é lento (~200 KB/s): só GET, 2 downloads por vez,
   coleta incremental (só baixa meses novos + os mais recentes).
 
-- Pipeline com três jobs independentes (`bcb`, `ibge`, `anp`, nessa ordem;
-  `PIPELINE_JOBS` escolhe): um que falha não impede os outros. O job da ANP
-  lê os municípios que o do IBGE gravou em `staging.municipalities`.
+- Pipeline com seis jobs independentes (`bcb`, `fred`, `ibge`, `anp`,
+  `anp_serie`, `analysis`, nessa ordem; `PIPELINE_JOBS` escolhe): um que
+  falha não impede os outros. O job da ANP lê os municípios que o do IBGE
+  gravou em `staging.municipalities`; o `analysis` lê a mart.
 - `pg.copy_frame`: COPY em formato CSV (polars `write_csv`), compartilhado.
   Staging grande (`staging.fuel_prices`) é esvaziado com TRUNCATE; a mart,
   lida pela API, com DELETE (MVCC). `mart.municipalities` é atualizada com
@@ -196,6 +205,39 @@ Qualidade e clareza importam mais que quantidade de features.
   mediana de postos do produto (ex.: bordas de um mês que a ANP não
   publicou) saem do Brasil e de todas as UFs.
 
+- Fase 4 (nov/2026). Fontes novas gravadas inteiras em `raw.source_files`
+  (`collect.Files`: valida o formato, gzip, só grava se o SHA-256 mudou):
+  `anp_serie` (planilhas da série histórica semanal do Brasil, 2004-2012 e
+  desde 2013; o pipeline procura a linha "DATA INICIAL" em vez de fixar o
+  cabeçalho; lidas com fastexcel) e `fred` (CSV do Brent DCOILBRENTEU, sem
+  chave; o validador era exercício do usuário, que pediu a resposta).
+- Série oficial da ANP em `mart.fuel_prices_anp_weekly` (semana de domingo
+  vira a segunda seguinte; GLP fica de fora; "ÓLEO DIESEL" até 2012 = diesel).
+  A média oficial não é a média simples dos postos (fica abaixo de qualquer
+  média simples; provavelmente pondera por volume): o aviso que compara as
+  duas (limite 2%) só olha gasolina, aditivada, diesel e S10 (0,4% a 1,1%);
+  etanol (5%) e GNV (2,6%) ficam fora.
+- Brent como indicador `brent` (fonte FRED) em `mart.indicators`; a carga
+  completa do BCB apaga só os indicadores do BCB. Card e gráfico na home.
+- Job `analysis`: roda quando `bcb`, `fred` ou `anp_serie` carregaram coleta
+  nova (maior `source_run_id` deles). Variação log em 4 semanas; correlação
+  com `usd_brl`, `brent_usd`, `brent_brl` (Brent × dólar do dia), defasagem
+  0-12, por período (`analysis/regimes.py`: até 14/10/2016, PPI até
+  16/05/2023, atual); móvel de 52 semanas na melhor defasagem do período
+  atual. Produtos: gasolina, etanol, diesel, diesel_s10.
+- Previsão: naive contra regressão (numpy, janela de 156 semanas, variações
+  do Brent em R$ até a semana anterior), backtest nas últimas 104 semanas,
+  publica o de menor MAE médio, faixa de 80% pelos percentis 10/90 dos erros
+  do backtest. Resultado real: naive vence em todos (a regressão erra 19% a
+  47% a mais); uma variável de "atraso" bomba × petróleo piorou. A página diz
+  isso abertamente.
+- Web `/analises?combustivel=`: links (não router.push), quatro gráficos
+  (`components/analysis/`) com duas cores (destaque = petróleo em R$, cinza =
+  dólar), eixo de correlação com marcas fixas e limites alinhados, tabela
+  acessível em cada um; textos com a preposição certa (`ANALYSIS_FUELS.of`).
+- O usuário roda os comandos de teste no PowerShell 5.1: usar `curl.exe` com
+  `http://`.
+
 ## Regra de arquitetura
 Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
 (raw → staging → mart). A API só lê `mart`.
@@ -209,6 +251,7 @@ Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
 - Fase 3: cargas incrementais, testes, validação de dados, cache, coleta agendada,
   endpoint de saúde dos dados. Concluída (nov/2026).
 - Fase 4: análises (previsão de preços, correlação dólar × gasolina).
+  Concluída (nov/2026).
 - Fase 5: assistente com LLM (pergunta em português → SQL → resposta + gráfico).
 - Fase 6: README caprichado, diagrama, GIF de demo.
 Não avançar de fase sem a anterior estar funcionando.

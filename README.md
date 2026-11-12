@@ -1,7 +1,7 @@
 # Radar Econômico
 
-Coleta dados públicos brasileiros (Banco Central, IBGE e ANP), processa em
-camadas e exibe num dashboard web com gráficos e mapa.
+Coleta dados públicos (Banco Central, IBGE, ANP e o petróleo Brent no FRED),
+processa em camadas e exibe num dashboard web com gráficos, mapa e análises.
 
 > **No ar: [radar-economico-phi.vercel.app](https://radar-economico-phi.vercel.app)**
 > (API em [radar-economico-api.onrender.com](https://radar-economico-api.onrender.com/health/data)).
@@ -11,7 +11,9 @@ camadas e exibe num dashboard web com gráficos e mapa.
 > publicados e também rodando localmente com `docker compose up`. A Fase 3, a operação dos dados, também está
 > concluída: registro das execuções, validação em dois níveis, cache, cargas
 > incrementais, saúde dos dados, testes de contrato, coleta agendada e um
-> canário diário contra as fontes reais.
+> canário diário contra as fontes reais. A **Fase 4**, as análises, também:
+> quanto o preço na bomba acompanha o petróleo e o dólar desde 2004, e a
+> previsão das próximas semanas testada contra o passado.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/combustiveis-escuro.png">
@@ -48,15 +50,17 @@ docker compose exec postgres psql -U radar -c '\dn'   # deve listar raw, staging
 Além do Postgres, o `docker compose up` sobe:
 
 1. **collector** (roda uma vez): coleta em paralelo o Banco Central (Selic,
-   IPCA, dólar), o IBGE (municípios e coordenadas) e a ANP (preços de
-   combustíveis por posto, últimos 12 meses) e grava tudo, intacto, no schema
-   `raw`. As coletas são **incrementais**: a primeira traz o histórico (o BCB
+   IPCA, dólar), o IBGE (municípios e coordenadas), a ANP (preços de
+   combustíveis por posto, últimos 12 meses, e a série histórica semanal do
+   Brasil desde 2004, em planilhas) e o FRED (petróleo Brent diário) e grava
+   tudo, intacto, no schema `raw`. Planilhas e CSVs só são gravados de novo
+   quando o conteúdo muda (SHA-256). As coletas são **incrementais**: a primeira traz o histórico (o BCB
    desde 2000; a primeira da ANP leva alguns minutos, porque o servidor é
    lento), e as seguintes só buscam o que pode ter mudado. No BCB, isso são
    as últimas semanas de cada série, com uma margem para valores publicados
    com atraso ou corrigidos: ~3 KB por coleta, em vez de ~100 KB;
-2. **pipeline** (roda uma vez, depois do collector): três jobs, cada um lendo
-   do `raw` só o que chegou desde a última execução, validando com pandera e
+2. **pipeline** (roda uma vez, depois do collector): seis jobs, cada um lendo
+   só o que chegou desde a última execução, validando com pandera e
    gravando `staging` e `mart`:
    - **bcb**: indicadores (`mart.indicator_values`). Junta as coletas novas e
      grava com upsert (insere as datas novas, atualiza os valores corrigidos
@@ -66,7 +70,14 @@ Além do Postgres, o `docker compose up` sobe:
      municípios do IBGE, e as médias semanais por UF e Brasil
      (`mart.fuel_prices_weekly`) e mensais por município
      (`mart.fuel_prices_municipal`). Reconstrói tudo em uns 5 segundos quando
-     chega arquivo novo.
+     chega arquivo novo;
+   - **fred**: o Brent como indicador (`mart.indicator_values`, ao lado dos do BCB);
+   - **anp_serie**: a média semanal oficial da ANP desde 2004
+     (`mart.fuel_prices_anp_weekly`). Um aviso compara com a média que o job
+     **anp** calcula dos postos: na gasolina e no diesel elas diferem 0,4% a
+     1,1%; no etanol e no GNV a oficial é ponderada e a diferença é estrutural;
+   - **analysis**: as correlações e a previsão (ver [Análises](#análises)),
+     a partir do que os outros jobs gravaram na mart.
 
    Sem nada novo no `raw`, o job termina na hora, sem tocar na mart.
 
@@ -132,13 +143,14 @@ npm --prefix web run dev                # web fora do Docker, em http://localhos
 
 ## Dashboard
 
-Next.js 16 (App Router, Cache Components) em http://localhost:3000, com duas
+Next.js 16 (App Router, Cache Components) em http://localhost:3000, com três
 páginas, tema claro e escuro, e funcionando no celular.
 
 **Indicadores** (`/`):
 
 - **Cards** com o último valor de cada indicador: a última decisão do Copom
-  sobre a Selic, o IPCA acumulado em 12 meses e a variação diária do dólar;
+  sobre a Selic, o IPCA acumulado em 12 meses e a variação diária do dólar e
+  do petróleo Brent;
 - **Gráficos** (ECharts): Selic em degraus (só muda nas reuniões do Copom),
   IPCA em barras (cada mês é uma variação, acima ou abaixo de zero) e dólar
   em linha, com um seletor de período único para os três;
@@ -166,6 +178,12 @@ páginas, tema claro e escuro, e funcionando no celular.
 - **Rankings** dos mais baratos e mais caros (só municípios com 3 ou mais
   postos) e a **tabela** de todos os municípios do mês.
 
+**Análises** (`/analises`), por combustível (gasolina, diesel S10 e S500,
+etanol): a correlação com o petróleo em reais e com o dólar em cada período
+da política de preços, por semanas de defasagem e em janela móvel, e a
+previsão das próximas 8 semanas com a faixa de 80% e o erro de cada modelo
+no teste com o passado. Cada gráfico tem legenda, rótulos diretos e tabela.
+
 O mapa não depende de nenhum serviço de mapas: o fundo é o contorno dos
 estados, gerado a partir da malha do IBGE por `web/scripts/build-ufs-geojson.mjs`
 e guardado em `web/public/geo/ufs.json`. O worker do MapLibre é copiado de
@@ -187,11 +205,13 @@ fica em [`api/openapi.yaml`](api/openapi.yaml) e é servida em `/openapi.yaml`.
 |---|---|
 | `GET /health` | `{"status":"ok"}` |
 | `GET /health/data` | Se os dados estão em dia: a data mais recente de cada conjunto, a última execução de cada job e os avisos de qualidade. 200 ou 503 |
-| `GET /v1/indicators` | Indicadores (`selic`, `ipca`, `usd_brl`) com o valor mais recente |
+| `GET /v1/indicators` | Indicadores (`selic`, `ipca`, `usd_brl`, `brent`) com o valor mais recente |
 | `GET /v1/indicators/{id}/values?from=AAAA-MM-DD&to=AAAA-MM-DD` | Série histórica; `from` e `to` são opcionais |
 | `GET /v1/fuels` | Combustíveis (`gasolina`, `etanol`, `diesel_s10`...) com a média nacional da última semana |
 | `GET /v1/fuels/{id}/prices?scope=BR\|UF&from=&to=` | Média semanal no Brasil (padrão) ou numa UF |
 | `GET /v1/fuels/{id}/municipalities?month=AAAA-MM` | Preço em cada município pesquisado, com coordenadas (mapa); sem `month`, o mais recente |
+| `GET /v1/fuels/{id}/pass-through` | Correlação do preço com o dólar e o Brent, por período da política de preços e defasagem, e a correlação móvel |
+| `GET /v1/fuels/{id}/forecast` | Previsão de 1 a 8 semanas com intervalo de 80%, o erro de cada modelo no backtest e as últimas 104 semanas da série oficial |
 
 ```bash
 curl "http://localhost:8080/v1/indicators/usd_brl/values?from=2026-11-01"
@@ -208,8 +228,10 @@ A conexão com o banco é aberta em modo somente leitura
 
 O `GET /health/data` compara a data do dado mais recente de cada conjunto com
 o ritmo da fonte: até 5 dias para a Selic e o dólar (fins de semana e
-feriados), 75 para o IPCA (que sai por volta do dia 10 do mês seguinte) e 60
-para a ANP (arquivos mensais, publicados semanas depois). Responde 503 quando
+feriados), 75 para o IPCA (que sai por volta do dia 10 do mês seguinte), 60
+para a ANP (arquivos mensais, publicados semanas depois), 15 para o Brent (o
+FRED publica com cerca de uma semana de atraso) e 21 para a série semanal
+oficial da ANP. Responde 503 quando
 algo atrasou ou quando a última execução de um job falhou, para um monitor
 externo avisar; a mensagem de erro do job fica só no banco.
 
@@ -230,6 +252,38 @@ As queries ficam em `api/queries/` e o código Go correspondente é gerado pelo
 docker run --rm -v "${PWD}:/src" -w /src/api sqlc/sqlc:1.31.1 generate
 ```
 
+## Análises
+
+Calculadas pelo job **analysis** do pipeline (`pipeline/src/radar_pipeline/analysis/`),
+com a série semanal oficial da ANP (desde 2004), o dólar do BCB e o Brent do
+FRED. O petróleo em reais é o Brent multiplicado pelo dólar do mesmo dia.
+
+**Repasse para a bomba.** Correlação entre a variação em 4 semanas do preço
+médio no Brasil e a variação do fator 0 a 12 semanas antes (variações, e não
+níveis: os níveis sobem juntos com a inflação e dariam 0,92 de correlação sem
+dizer nada). Calculada separadamente em cada período da política de preços da
+Petrobras: preços administrados (até out/2016), paridade internacional (até
+mai/2023) e a estratégia atual. O que os dados mostram:
+
+| | 2004–2016 | 2016–2023 | Desde 2023 |
+|---|---|---|---|
+| Gasolina × petróleo em R$ | 0,06 | 0,49 (3 semanas depois) | 0,41 (2 semanas) |
+| Diesel S10 × petróleo em R$ | 0,19 | 0,49 (2 semanas) | 0,55 (1 semana) |
+| Gasolina × dólar | 0,13 | −0,07 | 0,14 |
+
+O dólar sozinho quase não explica a bomba: quando o petróleo cai, o real
+costuma se desvalorizar, e os dois efeitos se compensam (correlação de −0,36
+entre as variações do dólar e do Brent).
+
+**Previsão.** Dois modelos, testados nas últimas 104 semanas com o que se
+sabia em cada semana (backtest): repetir o último preço (*naive*) e uma
+regressão da variação futura sobre a variação recente do petróleo em reais. A
+página publica o de menor erro, com o intervalo de 80% tirado dos erros do
+teste. Nos dados reais, o *naive* vence em todos os combustíveis (a regressão
+erra de 19% a 47% a mais): a bomba segue o petróleo, mas os reajustes vêm em
+degraus e em datas que ninguém sabe antes. Uma variação com o "atraso" da
+bomba em relação ao petróleo também foi testada, e errou mais.
+
 ## Deploy
 
 Tudo em planos gratuitos, sem cartão de crédito.
@@ -237,7 +291,7 @@ Tudo em planos gratuitos, sem cartão de crédito.
 | Parte | Onde | Como publica |
 |---|---|---|
 | Banco | [Neon](https://neon.com) Free (Postgres 16, AWS `sa-east-1`, São Paulo) | as migrations rodam nos workflows |
-| Dados | GitHub Actions ([`data.yml`](.github/workflows/data.yml)) | todo dia às 9h (com a variável `COLETA_AGENDADA=true`) ou disparo manual: migrations → coletor → pipeline |
+| Dados | GitHub Actions ([`data.yml`](.github/workflows/data.yml)) | todo dia às 9h (com a variável `COLETA_AGENDADA=true`) ou disparo manual: migrations → coletor (BCB, ANP, série da ANP, Brent) → pipeline |
 | API | [Render](https://render.com) Free ([`render.yaml`](render.yaml), Blueprint, região Virginia) | a cada push na `main` que mexa em `api/` |
 | Dashboard | [Vercel](https://vercel.com) Hobby (pasta `web`, região `gru1`, São Paulo) | a cada push na `main` |
 
@@ -275,15 +329,16 @@ Fontes públicas mudam sem aviso: uma coluna nova no CSV da ANP, um endpoint
 diferente no Banco Central. O workflow [`fontes.yml`](.github/workflows/fontes.yml)
 roda todo dia às 7h30 e refaz o caminho inteiro contra as fontes reais,
 num Postgres temporário do próprio GitHub Actions: migrations → coleta
-(BCB, e a ANP só dos 2 últimos meses) → pipeline → API, que precisa responder
-`/health/data` com 200. Se algo mudou na fonte, ele falha e o GitHub avisa por
+(BCB, a ANP só dos 2 últimos meses, a série histórica da ANP e o Brent) →
+pipeline (inclusive as análises) → API, que precisa responder `/health/data`
+com 200 e trazer a previsão da gasolina com as 8 semanas. Se algo mudou na fonte, ele falha e o GitHub avisa por
 e-mail no mesmo dia, antes de a coleta de produção dar problema. Os erros do
 coletor aparecem como anotações na página da execução, e o resultado de
 `/health/data` fica no resumo.
 
 Logo na primeira execução, o canário mostrou que **o IBGE recusa conexões
 vindas de fora do Brasil**, e os servidores do Actions ficam nos EUA. Por
-isso, tanto o canário quanto a coleta de produção buscam só o BCB e a ANP. No
+isso, nem o canário nem a coleta de produção buscam o IBGE. No
 canário, os municípios (de que o job da ANP precisa) vêm de um retrato de
 93 KB em [`.github/canario/`](.github/canario/); em produção, são carregados
 uma vez a partir de uma máquina no Brasil (ver acima).
