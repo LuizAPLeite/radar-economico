@@ -1,44 +1,125 @@
 # Radar Econômico
 
-Coleta dados públicos (Banco Central, IBGE, ANP e o petróleo Brent no FRED),
-processa em camadas e exibe num dashboard web com gráficos, mapa, análises e
-um assistente que responde perguntas em português escrevendo o SQL.
+**Dados públicos da economia brasileira, de ponta a ponta:** coleta de cinco
+fontes, pipeline em camadas com validação, API REST, dashboard com gráficos e
+mapa, análises estatísticas e um assistente que responde perguntas em
+português escrevendo o SQL. Tudo em produção, com custo zero.
 
-> **No ar: [radar-economico-phi.vercel.app](https://radar-economico-phi.vercel.app)**
-> (API em [radar-economico-api.onrender.com](https://radar-economico-api.onrender.com/health/data)).
->
-> **Fases 1 e 2 concluídas:** Selic, IPCA e dólar do Banco Central, e os
-> preços de combustíveis da ANP com mapa por município, de ponta a ponta,
-> publicados e também rodando localmente com `docker compose up`. A Fase 3, a operação dos dados, também está
-> concluída: registro das execuções, validação em dois níveis, cache, cargas
-> incrementais, saúde dos dados, testes de contrato, coleta agendada e um
-> canário diário contra as fontes reais. A **Fase 4**, as análises, também:
-> quanto o preço na bomba acompanha o petróleo e o dólar desde 2004, e a
-> previsão das próximas semanas testada contra o passado. E a **Fase 5**, o
-> assistente: pergunta em português → SQL escrito por um LLM (Gemini) →
-> resposta com gráfico, tabela e o SQL usado, com quatro camadas de proteção.
+**[Ver o site no ar](https://radar-economico-phi.vercel.app)** ·
+[API](https://radar-economico-api.onrender.com/health/data) ·
+[Especificação OpenAPI](https://radar-economico-api.onrender.com/openapi.yaml)
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/img/combustiveis-escuro.png">
-  <img alt="Página de combustíveis do Radar Econômico: filtros de combustível e estado, cards com a gasolina a R$ 6,51 no Brasil, o município mais barato (Goiatuba, R$ 5,74) e o mais caro (Parintins, R$ 8,99) em outubro de 2026, o gráfico do preço médio semanal e o mapa do Brasil com um ponto colorido por município pesquisado, ao lado dos rankings" src="docs/img/combustiveis.png">
-</picture>
+![Demonstração: a página de indicadores, o mapa de preços da gasolina por município, as análises de repasse do petróleo para a bomba e o assistente respondendo "Qual estado tem o diesel S10 mais caro?" com Acre, R$ 8,305](docs/img/demo.gif)
+
+## O que dá para ver
+
+| | |
+|---|---|
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/inicio-escuro.png"><img alt="Indicadores: cards da Selic (13,75%), do IPCA (0,82% em setembro), do dólar (R$ 5,56) e do Brent (US$ 107,03), e o gráfico da Selic em degraus nos últimos 5 anos" src="docs/img/inicio.png"></picture> **Indicadores**: Selic, IPCA, dólar e petróleo Brent, com um seletor de período para todos os gráficos. | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/combustiveis-escuro.png"><img alt="Combustíveis: gasolina a R$ 6,51 no Brasil, o município mais barato (Goiatuba, R$ 5,74) e o mais caro (Parintins, R$ 8,99), o gráfico semanal e o mapa com um ponto por município" src="docs/img/combustiveis.png"></picture> **Combustíveis**: preço semanal por estado e o mapa dos ~400 municípios pesquisados pela ANP. |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/analises-escuro.png"><img alt="Análises do diesel S10: desde 2023, a bomba acompanha o petróleo em reais uma semana depois (correlação de 0,55); o dólar sozinho explica pouco (0,15). Gráfico de barras por período da política de preços" src="docs/img/analises.png"></picture> **Análises**: quanto a bomba acompanha o petróleo e o dólar desde 2004, e a previsão testada contra o passado. | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/assistente-escuro.png"><img alt="Assistente: a pergunta 'Como o preço médio da gasolina variou por ano desde 2015?' respondida com um gráfico de linha de R$ 3,35 em 2015 a R$ 6,54 em 2026 e a tabela por ano" src="docs/img/assistente.png"></picture> **Assistente**: pergunta em português → SQL escrito pelo Gemini → gráfico, tabela e o SQL usado. |
+
+## Destaques técnicos
+
+**Engenharia de dados**
+- Arquitetura em camadas **raw → staging → mart** no PostgreSQL: o dado bruto
+  fica intacto (JSON e arquivos originais, compactados), e qualquer regra pode
+  ser reprocessada a partir dele.
+- **Cargas incrementais** em todas as fontes (o BCB busca só as últimas
+  semanas; a ANP, só os meses novos; planilhas e CSVs só entram quando o
+  SHA-256 muda) e **upsert** que nunca apaga histórico.
+- **Validação em dois níveis**: contrato com pandera (falhou, a mart fica
+  intacta) e avisos de qualidade calibrados com os dados reais (que não barram
+  a carga). Cada execução fica registrada, com origem, linhas e avisos.
+- Conferência cruzada: na gasolina, a média que o pipeline calcula dos ~780
+  mil preços por posto fica a 0,4% da média oficial da ANP.
+
+**Back-end (Go)**
+- Coletor concorrente (goroutines, `errgroup` com limite, retry com backoff e
+  jitter, logs estruturados) e API com chi, pgx e **sqlc** (SQL tipado).
+- **Teste de contrato**: cada resposta da API, de sucesso e de erro, é validada
+  contra a `openapi.yaml`; a spec não tem como ficar desatualizada.
+- Cache em memória genérico (decorator da camada de dados) para o banco
+  gratuito dormir entre as visitas.
+
+**Análises e honestidade estatística**
+- Correlação com defasagem por período da política de preços da Petrobras: a
+  bomba segue o **petróleo em reais** com 1 a 3 semanas de atraso desde 2016;
+  o dólar sozinho quase não explica.
+- Previsão com **backtest** de 104 semanas: o modelo simples ("o preço fica
+  igual") venceu a regressão com o petróleo, e a página publica o vencedor e
+  diz por quê.
+
+**LLM com segurança**
+- O Gemini escreve o SQL; a API aplica **quatro camadas**: prompt restrito,
+  validação do SQL, um papel do Postgres que só lê tabelas públicas e
+  transação somente leitura com tempo máximo. Cota grátis protegida por cache
+  e limite diário; o provedor fica atrás de uma interface.
+
+**Front-end e produto**
+- Next.js 16 com Server Components (o navegador nunca fala com a API), gráficos
+  ECharts e mapa MapLibre sem serviço de mapas, modo claro e escuro, celular,
+  e uma tabela acessível ao lado de cada gráfico.
+
+**Operação**
+- CI com testes de Go, Python e web, migrations up → down → up e `sqlc diff`;
+  coleta diária agendada; **canário** diário que refaz o caminho inteiro
+  contra as fontes reais e avisa quando uma fonte muda de formato.
+- Em produção com **custo zero**: Vercel, Render, Neon, GitHub Actions,
+  UptimeRobot e o plano grátis do Gemini.
 
 ## Arquitetura
 
-```
-fontes públicas ──► collector (Go) ──► raw ──► pipeline (Python) ──► staging ──► mart ──► api (Go) ──► web (Next.js)
+```mermaid
+flowchart LR
+    subgraph fontes["Fontes públicas"]
+        BCB["Banco Central<br/>Selic, IPCA, dólar"]
+        ANP["ANP<br/>preços por posto e<br/>série semanal desde 2004"]
+        IBGE["IBGE<br/>municípios"]
+        FRED["FRED<br/>petróleo Brent"]
+    end
+
+    subgraph pg["PostgreSQL (Neon)"]
+        RAW[("raw<br/>dado bruto intacto")]
+        STG[("staging<br/>limpo e tipado")]
+        MART[("mart<br/>pronto para servir")]
+    end
+
+    COL["collector<br/>Go"]
+    PIPE["pipeline<br/>Python, polars, pandera"]
+    API["api<br/>Go, chi, sqlc"]
+    LLM["Gemini<br/>escreve o SQL"]
+    WEB["web<br/>Next.js, ECharts, MapLibre"]
+
+    BCB & ANP & IBGE & FRED --> COL --> RAW
+    RAW --> PIPE
+    PIPE --> STG
+    PIPE --> MART
+    MART -->|"somente leitura"| API
+    API <-->|"pergunta → SQL"| LLM
+    API --> WEB
+
+    GHA["GitHub Actions<br/>CI, coleta diária, canário"] -.-> COL
+    GHA -.-> PIPE
 ```
 
-Coletor e pipeline não se chamam diretamente: comunicam-se pelo banco.
-A API só lê o schema `mart`.
+O coletor e o pipeline não se chamam: comunicam-se pelo banco. A API só lê o
+schema `mart`, numa conexão que o Postgres mantém somente leitura.
 
 | Pasta | Stack | Papel |
 |---|---|---|
 | `collector/` | Go | Coleta concorrente das fontes, grava em `raw` |
-| `pipeline/` | Python, polars, pandera | Limpa e valida `raw` → `staging` → `mart` |
-| `api/` | Go | API REST somente leitura sobre `mart`, e o assistente (LLM → SQL) |
-| `web/` | Next.js, TypeScript, Tailwind, ECharts, MapLibre | Dashboard com gráficos e mapa |
-| `db/migrations/` | SQL (golang-migrate) | Schemas e tabelas |
+| `pipeline/` | Python, polars, pandera | Limpa e valida `raw` → `staging` → `mart`; análises |
+| `api/` | Go, chi, pgx, sqlc | API REST somente leitura sobre `mart` e o assistente (LLM → SQL) |
+| `web/` | Next.js, TypeScript, Tailwind, ECharts, MapLibre | Dashboard com gráficos, mapa e assistente |
+| `db/migrations/` | SQL (golang-migrate) | Schemas, tabelas e o papel restrito do assistente |
+
+| Onde roda | Serviço | Plano |
+|---|---|---|
+| Site | Vercel (São Paulo) | Hobby, grátis |
+| API | Render (Virginia), mantida acordada pelo UptimeRobot | Free |
+| Banco | Neon, Postgres 16 (São Paulo) | Free |
+| Coleta, CI e canário | GitHub Actions | grátis |
+| Assistente | Gemini 3.5 Flash-Lite | plano grátis |
 
 ## Rodando localmente
 
@@ -159,11 +240,6 @@ páginas, tema claro e escuro, e funcionando no celular.
   em linha, com um seletor de período único para os três;
 - **Tabela** com os valores mais recentes ao lado de cada gráfico, como
   alternativa acessível.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/img/dashboard-escuro.png">
-  <img alt="Página de indicadores: cards com a meta Selic (13,75% ao ano), o IPCA (0,82% em setembro, 4,58% em 12 meses) e o dólar (R$ 5,5013), seguidos de um gráfico de cada indicador nos últimos 5 anos" src="docs/img/dashboard.png">
-</picture>
 
 **Combustíveis** (`/combustiveis`):
 
@@ -401,3 +477,20 @@ aplicados pelo serviço `migrate` do Compose. Para reverter tudo:
 ```bash
 docker compose run --rm migrate -path=/migrations -database="postgres://radar:radar@postgres:5432/radar?sslmode=disable" down -all
 ```
+
+## Como o projeto evoluiu
+
+Construído em fases, cada uma funcionando de ponta a ponta antes da seguinte:
+
+1. **Banco Central** (Selic, IPCA, dólar): monorepo, Docker Compose,
+   migrations, coletor, pipeline, API, dashboard e deploy.
+2. **ANP**: ~780 mil preços por posto por ano, casados com os municípios do
+   IBGE, filtros na URL e o mapa.
+3. **Operação dos dados**: cargas incrementais, validação em dois níveis,
+   registro das execuções, cache, saúde dos dados, testes de contrato, coleta
+   agendada e o canário.
+4. **Análises**: série oficial da ANP desde 2004, petróleo Brent, repasse
+   por período da política de preços e previsão com backtest.
+5. **Assistente**: pergunta em português → SQL pelo Gemini → resposta, com
+   quatro camadas de proteção.
+6. **Acabamento**: este README, o diagrama e a demonstração.

@@ -267,6 +267,14 @@ Qualidade e clareza importam mais que quantidade de features.
   mês, dia); série noutra escala (razão > 5) fica fora do gráfico, com aviso;
   legenda sempre; no máximo 2 séries. Menu com `flex-wrap` (5 links).
 
+- Fase 6 (nov/2026). README como vitrine: links, GIF, galeria das quatro
+  páginas (claro/escuro com `<picture>`), destaques técnicos, diagrama
+  Mermaid (o GitHub desenha) e a evolução por fases; o detalhe de cada parte
+  fica nas seções de baixo. Imagens em `docs/img/`, geradas do site publicado
+  por `docs/scripts/shoot.mjs` (Edge headless via CDP, roteiros em JSON) e o
+  GIF por `make_gif.py` (Pillow via `uv run --with`, 128 cores por quadro,
+  ~0,2 MB). Atualizar as imagens quando as páginas mudarem.
+
 ## Regra de arquitetura
 Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
 (raw → staging → mart). A API só lê `mart`.
@@ -284,6 +292,7 @@ Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
 - Fase 5: assistente com LLM (pergunta em português → SQL → resposta + gráfico).
   Concluída (nov/2026).
 - Fase 6: README caprichado, diagrama, GIF de demo.
+  Concluída (nov/2026).
 Não avançar de fase sem a anterior estar funcionando.
 
 ## Como trabalhamos juntos
