@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/", label: "Indicadores" },
   { href: "/combustiveis", label: "Combustíveis" },
   { href: "/analises", label: "Análises" },
+  { href: "/assistente", label: "Assistente" },
 ] as const;
 
 /**
@@ -18,7 +19,8 @@ export function SiteNav() {
   const pathname = usePathname();
   return (
     <nav aria-label="Páginas">
-      <ul className="flex gap-1">
+      {/* flex-wrap: no celular, os links que não cabem descem para a linha de baixo. */}
+      <ul className="flex flex-wrap gap-1">
         {LINKS.map(({ href, label }) => {
           const current = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (

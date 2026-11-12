@@ -54,7 +54,10 @@ REGRAS DO SQL:
 - "Hoje" é a data informada junto com a pergunta; "último" é o dado mais recente na tabela.
 
 GRÁFICO (chart):
-- "line" para séries no tempo: x = coluna da data, y = 1 a 3 colunas numéricas.
+- "line" para séries no tempo: x = coluna da data, y = 1 a 2 colunas numéricas.
+- Em y, só colunas na MESMA unidade e escala (ex.: preço da gasolina e do etanol, ambos em R$/l).
+  Unidades diferentes (dólar em R$ e Brent em US$, Selic em % e preço em R$): ponha em y só a
+  principal; as outras ficam no resultado, para a tabela.
 - "bar" para comparar categorias (até 30 barras): x = coluna da categoria, y = 1 ou 2 colunas numéricas.
 - "none" para um valor único ou uma lista sem gráfico útil (x vazio, y vazio).
 

@@ -177,6 +177,49 @@ export async function getForecast(id: string): Promise<Forecast> {
   return getJSON<Forecast>(`/v1/fuels/${encodeURIComponent(id)}/forecast`);
 }
 
+// --- Assistente -----------------------------------------------------------------
+
+export interface AnswerColumn {
+  name: string;
+  type: "date" | "number" | "text";
+}
+
+/** Resposta de POST /v1/ask. */
+export interface Answer {
+  question: string;
+  answerable: boolean;
+  title: string;
+  explanation: string;
+  sql: string;
+  chart: { type: "line" | "bar" | "none"; x: string; y: string[] };
+  columns: AnswerColumn[];
+  rows: (string | number | boolean | null)[][];
+  truncated: boolean;
+  cached: boolean;
+}
+
+/** O resultado de uma pergunta: a resposta, ou o código do erro da API. */
+export type AskResult = { ok: true; answer: Answer } | { ok: false; code: string };
+
+/**
+ * Pergunta ao assistente. Os erros esperados (pergunta inválida, limite do
+ * dia, consulta impossível...) voltam como `{ok: false, code}`; a página
+ * escolhe a mensagem. Só falhas de rede viram exceção.
+ */
+export async function askAssistant(question: string): Promise<AskResult> {
+  const res = await fetch(apiUrl() + "/v1/ask", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  if (res.ok) {
+    return { ok: true, answer: (await res.json()) as Answer };
+  }
+  const body = (await res.json().catch(() => null)) as { error?: { code?: string } } | null;
+  return { ok: false, code: body?.error?.code ?? `http_${res.status}` };
+}
+
 /** Preço por município num mês (null = o mais recente). */
 export async function getFuelMunicipalities(id: string, month: string | null): Promise<FuelMunicipalities> {
   const query = month ? `?month=${encodeURIComponent(month)}` : "";
