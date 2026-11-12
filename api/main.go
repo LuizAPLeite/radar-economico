@@ -8,7 +8,7 @@
 //	              como 30m ou 1h (padrão 30m; 0 desliga o cache)
 //	GEMINI_API_KEY  chave da API do Gemini; sem ela, o assistente (POST
 //	              /v1/ask) fica desligado e responde 503
-//	GEMINI_MODEL  modelo do Gemini (padrão gemini-3.8-flash)
+//	GEMINI_MODEL  modelo do Gemini (padrão gemini-3.5-flash-lite)
 //	ASSISTANT_DAILY_LIMIT  perguntas novas por dia, abaixo da cota grátis
 //	              do Gemini (padrão 20; respostas guardadas não contam)
 package main
@@ -89,7 +89,7 @@ func run(logger *slog.Logger) error {
 		if err != nil {
 			return err
 		}
-		model := envOr("GEMINI_MODEL", "gemini-3.8-flash")
+		model := envOr("GEMINI_MODEL", "gemini-3.5-flash-lite")
 		today := func() string { return time.Now().In(loc).Format(time.DateOnly) }
 		svc := assistant.NewService(
 			assistant.NewGeminiPlanner(key, model, today),

@@ -25,7 +25,7 @@ const geminiAPIRevision = "2026-05-20"
 type GeminiPlanner struct {
 	HTTPClient *http.Client
 	APIKey     string
-	Model      string // ex.: gemini-3.8-flash
+	Model      string // ex.: gemini-3.5-flash-lite
 	BaseURL    string // GeminiBaseURL; os testes trocam por um servidor falso
 	// Today devolve a data de hoje (AAAA-MM-DD) em Brasília, mandada junto com
 	// a pergunta para "este ano", "último mês" etc. Os testes fixam a data.
