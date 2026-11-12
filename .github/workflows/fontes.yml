@@ -3,10 +3,11 @@ name: Canário das fontes
 # Todo dia às 7h30 de Brasília (10h30 UTC), e por disparo manual.
 #
 # Refaz o caminho inteiro contra as fontes reais, num Postgres temporário do
-# próprio Actions: migrations → coleta (BCB e ANP) → pipeline → API. Se o BCB
-# ou a ANP mudarem de formato (um CSV com colunas novas, um endpoint que
-# mudou), algum passo falha e o GitHub avisa por e-mail no mesmo dia, antes
-# de a coleta de produção dar problema. Não grava nada fora dele.
+# próprio Actions: migrations → coleta (BCB, ANP, série histórica da ANP e
+# Brent no FRED) → pipeline → API. Se uma fonte mudar de formato (um CSV com
+# colunas novas, uma planilha com outro cabeçalho, um endpoint que mudou),
+# algum passo falha e o GitHub avisa por e-mail no mesmo dia, antes de a
+# coleta de produção dar problema. Não grava nada fora dele.
 #
 # O IBGE fica de fora: ele recusa conexões vindas de fora do Brasil (os
 # servidores do Actions ficam nos EUA). Os municípios, de que o job da ANP
@@ -68,7 +69,7 @@ jobs:
           export ANP_START_MONTH=$(date -u -d "$(date -u +%Y-%m-01) -2 months" +%Y-%m)
           echo "ANP a partir de $ANP_START_MONTH"
           set +e
-          COLLECTOR_SOURCES=bcb_sgs,anp go run ./collector 2>&1 | tee collector.log
+          COLLECTOR_SOURCES=bcb_sgs,anp,anp_serie,fred go run ./collector 2>&1 | tee collector.log
           status=${PIPESTATUS[0]}
           set -e
           grep '"level":"ERROR"' collector.log | jq -r '"::error::\(.msg): \(.err // "")"' | cut -c1-900 || true
@@ -90,10 +91,11 @@ jobs:
           enable-cache: true
       - name: Pipeline (raw → staging → mart)
         working-directory: pipeline
-        run: PIPELINE_JOBS=bcb,anp uv run --locked --no-dev radar-pipeline
+        run: PIPELINE_JOBS=bcb,fred,anp,anp_serie,analysis uv run --locked --no-dev radar-pipeline
 
       # A API de verdade, sobre a mart recém-carregada: /health/data responde
-      # 200 só se os quatro conjuntos estão em dia e nenhum job falhou.
+      # 200 só se todos os conjuntos estão em dia e nenhum job falhou; e a
+      # previsão da gasolina precisa ter as 8 semanas.
       - name: API e saúde dos dados
         run: |
           go build -o "$RUNNER_TEMP/api" ./api
@@ -110,5 +112,11 @@ jobs:
           if [ "$status" != "200" ]; then
             echo "::error::/health/data respondeu $status"
             cat "$RUNNER_TEMP/api.log"
+            exit 1
+          fi
+          weeks=$(curl -sf localhost:8080/v1/fuels/gasolina/forecast | jq '.forecasts | length')
+          echo "Previsão da gasolina: $weeks semanas" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$weeks" != "8" ]; then
+            echo "::error::a previsão da gasolina veio com $weeks semanas (esperado 8)"
             exit 1
           fi

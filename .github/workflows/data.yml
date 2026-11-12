@@ -51,10 +51,10 @@ jobs:
       # O IBGE fica de fora: ele recusa conexões vindas de fora do Brasil, e os
       # servidores do Actions ficam nos EUA. Os municípios quase nunca mudam;
       # são carregados a partir de uma máquina no Brasil (ver o README, Deploy).
-      - name: Coleta (BCB e ANP)
+      - name: Coleta (BCB, ANP, série da ANP e Brent)
         run: go run ./collector
         env:
-          COLLECTOR_SOURCES: bcb_sgs,anp
+          COLLECTOR_SOURCES: bcb_sgs,anp,anp_serie,fred
 
       - uses: astral-sh/setup-uv@v6
         with:
