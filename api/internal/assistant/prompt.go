@@ -28,6 +28,9 @@ mart.fuel_prices_municipal(product_id, month date, ibge_code integer, avg_price,
   max_price numeric, n_stations integer)
   Média mensal por município, desde nov/2025; month é o dia 1 do mês.
 mart.municipalities(ibge_code integer, name text, uf text, latitude, longitude)
+  São MUNICÍPIOS (cidades), não estados. Não existe tabela com o nome dos estados: identifique um
+  estado pela sigla da UF (coluna scope em fuel_prices_weekly, uf aqui), e nunca junte com esta
+  tabela para obter o nome de um estado.
 
 mart.analysis_regimes(id, name, starts_on date, ends_on date, description)
   Períodos da política de preços da Petrobras: controle (até 14/10/2016), ppi (até 16/05/2023), atual.
@@ -46,6 +49,8 @@ mart.forecast_backtests(product_id, model, horizon_weeks, mae, mape double preci
 
 REGRAS DO SQL:
 - Um único SELECT (ou WITH ... SELECT). Sem ponto e vírgula, sem comentários, só as tabelas acima.
+- Prefira a consulta mais simples que responde: sem junções desnecessárias (a consulta tem no máximo
+  3 segundos para rodar).
 - No máximo 200 linhas: em séries longas, agregue (média por mês ou por ano com date_trunc).
 - Nomes de colunas do resultado em português, minúsculos, sem acento e com _ (ex.: mes, preco_medio, uf).
 - Arredonde valores com round(x::numeric, 2) (preços de combustível: 3 casas).
