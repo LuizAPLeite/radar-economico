@@ -17,6 +17,10 @@ func TestCheckSQL_Accepts(t *testing.T) {
 		{"with (CTE)", "WITH x AS (SELECT 1) SELECT * FROM x", "WITH x AS (SELECT 1) SELECT * FROM x"},
 		{"select colado no parêntese", "SELECT(1)", "SELECT(1)"},
 		{"subconsulta entre parênteses", "with t as (select 2) select * from t", "with t as (select 2) select * from t"},
+		// Nomes parecidos com os proibidos, mas legítimos, continuam passando.
+		{"coluna com nome parecido", "SELECT setting_config, sleep_hours FROM t", "SELECT setting_config, sleep_hours FROM t"},
+		{"funções comuns", "SELECT date_trunc('month', ref_date), round(avg(value)::numeric, 2) FROM mart.indicator_values GROUP BY 1",
+			"SELECT date_trunc('month', ref_date), round(avg(value)::numeric, 2) FROM mart.indicator_values GROUP BY 1"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -50,6 +54,17 @@ func TestCheckSQL_Rejects(t *testing.T) {
 		{"palavra parecida", "SELECTED 1"},
 		{"select no meio", "EXPLAIN SELECT 1"},
 		{"longo demais", "SELECT " + strings.Repeat("1, ", MaxSQLLength)},
+		// AM-01: a fuga do papel do assistente, e variações para driblar a regra.
+		{"fuga do papel (AM-01)", "SELECT set_config('role', 'neondb_owner', true), query_to_xml('SELECT 1', true, false, '')"},
+		{"set_config com esquema", "SELECT pg_catalog.set_config('role', 'x', true)"},
+		{"set_config entre aspas", `SELECT "set_config"('role', 'x', true)`},
+		{"set_config com espaço", "SELECT SET_CONFIG ('role', 'x', true)"},
+		{"query_to_xml sozinho", "SELECT query_to_xml('SELECT * FROM raw.collection_runs', true, false, '')"},
+		{"table_to_xml", "SELECT table_to_xml('raw.collection_runs', true, false, '')"},
+		{"dblink", "SELECT * FROM dblink('host=x', 'SELECT 1') AS t(a int)"},
+		{"ler arquivo do servidor", "SELECT pg_read_file('/etc/passwd')"},
+		{"dormir", "WITH x AS (SELECT pg_sleep(10)) SELECT * FROM x"},
+		{"escape Unicode", `SELECT U&"\0073et_config"('role', 'x', true)`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

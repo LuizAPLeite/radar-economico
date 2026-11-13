@@ -32,6 +32,25 @@ services:
       - up
     restart: "no"
 
+  # Liga o login do usuário da API (radar_api, migration 000009) com uma senha
+  # de desenvolvimento e encerra. Em produção, a senha é definida uma vez,
+  # fora do git (ver README, Segurança). Roda de novo a cada `up`: idempotente.
+  db-users:
+    image: postgres:16-alpine
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-radar}
+    command:
+      - psql
+      - --host=postgres
+      - --username=${POSTGRES_USER:-radar}
+      - --dbname=${POSTGRES_DB:-radar}
+      - --set=ON_ERROR_STOP=1
+      - --command=ALTER ROLE radar_api LOGIN PASSWORD '${RADAR_API_PASSWORD:-radar_api}'
+    restart: "no"
+
   # Coleta as séries do Banco Central uma vez e encerra.
   collector:
     build: ./collector
@@ -66,10 +85,12 @@ services:
   api:
     build: ./api
     depends_on:
-      migrate:
+      db-users:
         condition: service_completed_successfully
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-radar}:${POSTGRES_PASSWORD:-radar}@postgres:5432/${POSTGRES_DB:-radar}?sslmode=disable
+      # A API conecta como radar_api, que só lê a mart (como em produção), e
+      # não como o dono do banco: ver o achado AM-01 em docs/security.
+      DATABASE_URL: postgres://radar_api:${RADAR_API_PASSWORD:-radar_api}@postgres:5432/${POSTGRES_DB:-radar}?sslmode=disable
       PORT: "8080"
       # Cache curto no desenvolvimento: o que o pipeline grava aparece em até
       # 1 minuto. Em produção vale 30m (render.yaml).

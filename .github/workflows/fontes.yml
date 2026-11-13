@@ -96,10 +96,14 @@ jobs:
       # A API de verdade, sobre a mart recém-carregada: /health/data responde
       # 200 só se todos os conjuntos estão em dia e nenhum job falhou; e a
       # previsão da gasolina precisa ter as 8 semanas.
+      # A API roda como radar_api, com as permissões de produção: se faltar
+      # uma permissão a uma tabela nova da mart, o canário falha aqui.
       - name: API e saúde dos dados
         run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "ALTER ROLE radar_api LOGIN PASSWORD 'canario'"
           go build -o "$RUNNER_TEMP/api" ./api
-          PORT=8080 CACHE_TTL=0 "$RUNNER_TEMP/api" > "$RUNNER_TEMP/api.log" 2>&1 &
+          export API_DB="postgres://radar_api:canario@localhost:5432/radar?sslmode=disable"
+          DATABASE_URL="$API_DB" PORT=8080 CACHE_TTL=0 "$RUNNER_TEMP/api" > "$RUNNER_TEMP/api.log" 2>&1 &
           for i in $(seq 1 30); do curl -sf localhost:8080/health > /dev/null && break; sleep 1; done
           status=$(curl -s -o health.json -w "%{http_code}" localhost:8080/health/data)
           {
