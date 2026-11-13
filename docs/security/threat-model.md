@@ -162,8 +162,8 @@ seção 5.
 
 | ID | Risco | STRIDE | Achado | Fase que trata |
 |---|---|---|---|---|
-| AM-01 | **Alto** | E, I | Fuga do papel `radar_assistant` pelo SQL do assistente | 5 |
-| AM-02 | **Alto** | E, T, I | Uma credencial de dono do banco para API, coleta, pipeline e máquina local | 2 e 5 |
+| AM-01 | **Alto** | E, I | Fuga do papel `radar_assistant` pelo SQL do assistente. **Corrigido em 13/11/2026** (ver abaixo) | Antecipado |
+| AM-02 | **Alto** | E, T, I | Uma credencial de dono do banco para API, coleta, pipeline e máquina local. **Em parte**: a API já não usa a de dono | 2 e 5 |
 | AM-03 | Médio | D | Sem limite de requisições; cota do assistente esgotável por uma pessoa | 5 |
 | AM-04 | Médio | T | XSS provável no tooltip do gráfico do assistente | 5 e 6 |
 | AM-05 | Médio | T, I | Sem cabeçalhos de segurança (CSP e outros) no site e na API | 5 |
@@ -210,9 +210,33 @@ públicos e a escrita está bloqueada.
 
 **Causa raiz:** a API conecta como **dono do banco** (AM-02). Com um usuário
 próprio, sem acesso além da mart, voltar ao "próprio usuário" não daria
-nada. Correções candidatas (Fase 5): usuário só de leitura para a API e
-recusar funções perigosas no `CheckSQL` (`set_config`, `query_to_xml`,
-`dblink`...), como defesa em profundidade.
+nada.
+
+**Correção (13/11/2026, antecipada da Fase 5 por ser uma falha aberta em
+produção; o documento só foi publicado depois dela):**
+
+1. **Migration 000009:** usuário `radar_api`, que só lê as tabelas da mart
+   (no `pipeline_runs`, todas as colunas menos `error`) e pode entrar no papel
+   `radar_assistant`. A API passou a conectar com ele, em produção e no
+   Docker Compose. A senha de produção foi gerada aleatoriamente e definida
+   fora do git; só existe no Render e num arquivo local ignorado pelo git.
+2. **Defesa em profundidade:** o `CheckSQL` recusa funções que mudam a
+   sessão, executam outro SQL ou mexem no servidor (`set_config`,
+   `*_to_xml`, `dblink`, `pg_read_*`, `pg_sleep`...), inclusive escritas
+   entre aspas, com o esquema na frente ou com escape `U&`.
+3. **Regressão vigiada:** o canário diário roda a API como `radar_api`, com
+   as permissões de produção.
+
+**Verificação (o "depois"):** as mesmas consultas, agora como `radar_api`,
+no Postgres isolado e **no banco de produção**:
+
+| Consulta | Antes (como dono) | Depois (como `radar_api`) |
+|---|---|---|
+| Legítima (`SELECT count(*) FROM mart.fuel_products`) | Funciona | Funciona |
+| Voltar ao usuário da sessão e ler `pipeline_runs.error` | **Lia a mensagem** | Barrada: *permission denied for table pipeline_runs* |
+| Voltar ao usuário da sessão e ler o `raw` | **Lia** | Barrada: *permission denied for schema raw* |
+| Trocar para o dono (`set_config('role', 'neondb_owner', ...)`) | — | Barrada: *permission denied to set role* |
+| Qualquer uma delas pelo assistente | Chegava ao banco | Recusada antes, pelo `CheckSQL` |
 
 ### AM-02: uma credencial de dono para tudo (alto)
 
@@ -225,6 +249,10 @@ mas esse modo é só um padrão: a própria sessão pode desligá-lo.
 **Fase 5:** um usuário por componente, cada um só com o que precisa (o
 coletor grava em `raw`; o pipeline lê `raw` e grava `staging` e `mart`; a API
 só lê `mart`). **Fase 2:** conferir que a credencial nunca vazou no histórico.
+
+**Andamento (13/11/2026):** a API, a parte exposta na internet, já usa o
+`radar_api` (correção do AM-01). A credencial de dono continua no GitHub
+Actions (coleta e pipeline) e na máquina local.
 
 ### AM-03: sem limite de requisições (médio)
 

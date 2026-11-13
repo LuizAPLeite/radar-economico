@@ -275,6 +275,19 @@ Qualidade e clareza importam mais que quantidade de features.
   GIF por `make_gif.py` (Pillow via `uv run --with`, 128 cores por quadro,
   ~0,2 MB). Atualizar as imagens quando as páginas mudarem.
 
+- Segurança, DevSecOps (nov/2026, em andamento; roteiro em `PROMPT-DEVSECOPS.md`,
+  local). Modelo de ameaças em `docs/security/threat-model.md` (achados
+  AM-xx). A API conecta como `radar_api` (migration 000009): só SELECT nas
+  tabelas da mart (no `pipeline_runs`, todas as colunas menos `error`) e
+  `SET` no papel `radar_assistant`. Toda tabela nova da mart que a API ou o
+  assistente leiam precisa de GRANT explícito ao `radar_api` (e ao
+  `radar_assistant`, se for pública) na própria migration; o canário roda a
+  API como `radar_api` e falha se faltar. Senha do `radar_api` fora do git:
+  em produção, só no Render e em `.env.neon-api` local; no Compose, o
+  serviço `db-users` define `RADAR_API_PASSWORD`. Falhas abertas em produção
+  só são publicadas (docs) junto com a correção. Testes de segurança só
+  contra o nosso próprio sistema.
+
 ## Regra de arquitetura
 Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
 (raw → staging → mart). A API só lê `mart`.
