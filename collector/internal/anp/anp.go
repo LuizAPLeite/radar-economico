@@ -54,7 +54,9 @@ func (f File) Key() Key {
 }
 
 // linkPattern acha os links de arquivos mensais (pasta dsan/AAAA/) no HTML.
-var linkPattern = regexp.MustCompile(`href="(https?://[^"]+/shpc/dsan/\d{4}/[^"/]+\.csv)"`)
+// Só aceita HTTPS no www.gov.br, onde a ANP publica: se a página fosse
+// adulterada para apontar para outro servidor, o link seria ignorado (AM-08).
+var linkPattern = regexp.MustCompile(`href="(https://www\.gov\.br/[^"]+/shpc/dsan/\d{4}/[^"/]+\.csv)"`)
 
 // ExtractLinks devolve os links de arquivos mensais encontrados no HTML,
 // sem repetições e na ordem em que aparecem.

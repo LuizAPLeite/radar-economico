@@ -31,7 +31,8 @@ export default function AssistantPage() {
         <p>
           Como funciona: o Gemini (Google) transforma a pergunta em SQL; a API confere a consulta e a executa num
           acesso somente leitura, restrito às tabelas públicas do painel, com tempo máximo. O modelo pode errar ao
-          interpretar a pergunta: confira o SQL em cada resposta.
+          interpretar a pergunta: confira o SQL em cada resposta. O assistente usa o plano grátis do Gemini, em
+          que o Google pode usar as perguntas para melhorar os produtos dele: não escreva dados pessoais.
         </p>
         <p className="mt-2">
           Código aberto no{" "}
