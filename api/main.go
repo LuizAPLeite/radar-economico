@@ -32,6 +32,7 @@ import (
 	"github.com/LuizAPLeite/radar-economico/api/internal/db"
 	"github.com/LuizAPLeite/radar-economico/api/internal/httpapi"
 	"github.com/LuizAPLeite/radar-economico/api/internal/postgres"
+	"github.com/LuizAPLeite/radar-economico/api/internal/ratelimit"
 )
 
 // go:embed copia o arquivo para dentro do binário na compilação: a spec é
@@ -98,6 +99,14 @@ func run(logger *slog.Logger) error {
 			logger, limit, loc,
 		)
 		opts = append(opts, httpapi.WithAssistant(svc))
+
+		// Limite por IP, além do diário: perguntas por minuto de cada cliente.
+		perMinute, err := intEnv("ASK_RATE_LIMIT", 10)
+		if err != nil {
+			return err
+		}
+		trustProxy := os.Getenv("TRUST_PROXY") == "true"
+		opts = append(opts, httpapi.WithAskRateLimit(ratelimit.New(perMinute, time.Minute), trustProxy))
 		logger.Info("assistente ligado", "model", model, "daily_limit", limit)
 	} else {
 		logger.Info("assistente desligado (sem GEMINI_API_KEY)")

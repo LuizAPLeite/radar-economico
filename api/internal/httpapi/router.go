@@ -24,6 +24,7 @@ func NewRouter(store Store, logger *slog.Logger, openAPISpec []byte, opts ...Opt
 	r.Use(middleware.RequestID)   // um id por requisição, para cruzar com os logs
 	r.Use(requestLogger(logger))  // uma linha de log por requisição
 	r.Use(middleware.Recoverer)   // um panic vira 500, em vez de derrubar o servidor
+	r.Use(securityHeaders)        // cabeçalhos de segurança em toda resposta (security.go)
 	r.Use(middleware.Compress(5)) // gzip quando o cliente aceita (a série toda cai de ~400 KB para ~40 KB)
 
 	// Até os erros de roteamento respondem no formato JSON padrão da API.

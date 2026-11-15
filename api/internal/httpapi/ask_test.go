@@ -10,8 +10,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/LuizAPLeite/radar-economico/api/internal/assistant"
+	"github.com/LuizAPLeite/radar-economico/api/internal/ratelimit"
 )
 
 // fakeAsker devolve uma resposta pronta (ou erro) e guarda a pergunta.
@@ -101,5 +103,47 @@ func TestAsk_OnlyPost(t *testing.T) {
 	rec := do(t, &fakeStore{}, http.MethodGet, "/v1/ask")
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("GET /v1/ask: status %d, quer 405", rec.Code)
+	}
+}
+
+func TestAsk_RateLimitPerIP(t *testing.T) {
+	router := NewRouter(&fakeStore{}, slog.New(slog.NewTextHandler(io.Discard, nil)), []byte(testSpec),
+		WithAssistant(&fakeAsker{answer: selicAnswer}),
+		WithAskRateLimit(ratelimit.New(2, time.Minute), true))
+	ask := func(xff string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/v1/ask", strings.NewReader(`{"question":"Qual a Selic?"}`))
+		req.Header.Set("X-Forwarded-For", xff)
+		router.ServeHTTP(rec, req)
+		return rec
+	}
+	// O primeiro item é do cliente (pode ser inventado); vale o último, do proxy.
+	for i, xff := range []string{"9.9.9.1, 1.2.3.4", "9.9.9.2, 1.2.3.4"} {
+		if rec := ask(xff); rec.Code != http.StatusOK {
+			t.Fatalf("pergunta %d: status %d", i+1, rec.Code)
+		}
+	}
+	rec := ask("9.9.9.3, 1.2.3.4")
+	if rec.Code != http.StatusTooManyRequests || !strings.Contains(rec.Body.String(), `"rate_limited"`) || rec.Header().Get("Retry-After") != "60" {
+		t.Fatalf("terceira: status %d, Retry-After %q, corpo %s", rec.Code, rec.Header().Get("Retry-After"), rec.Body)
+	}
+	if rec := ask("1.2.3.5"); rec.Code != http.StatusOK {
+		t.Fatalf("outro IP: status %d", rec.Code)
+	}
+}
+
+func TestSecurityHeaders(t *testing.T) {
+	rec := post(t, nil, "/v1/ask", `{}`)
+	for k, want := range map[string]string{
+		"X-Content-Type-Options":  "nosniff",
+		"X-Frame-Options":         "DENY",
+		"Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+	} {
+		if got := rec.Header().Get(k); got != want {
+			t.Errorf("%s = %q, quer %q", k, got, want)
+		}
+	}
+	if rec.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Error("a API não deve liberar CORS")
 	}
 }

@@ -429,7 +429,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "429":
-          description: Limite de perguntas do dia (ou cota do modelo) atingido
+          description: >-
+            Limite atingido: `rate_limited` para muitas perguntas do mesmo IP
+            em pouco tempo (com `Retry-After`, em segundos); `assistant_limit`
+            para o limite do dia ou a cota do modelo
+          headers:
+            Retry-After:
+              description: Segundos até poder perguntar de novo (só em `rate_limited`)
+              schema:
+                type: integer
           content:
             application/json:
               schema:

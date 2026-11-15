@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/LuizAPLeite/radar-economico/api/internal/db"
+	"github.com/LuizAPLeite/radar-economico/api/internal/ratelimit"
 )
 
 // Store é tudo o que os handlers precisam do banco. Uma interface pode
@@ -39,6 +40,9 @@ type handlers struct {
 	store  Store
 	logger *slog.Logger
 	asker  Asker // nil: assistente desligado
+
+	askLimiter *ratelimit.Limiter // nil: sem limite por IP
+	trustProxy bool
 }
 
 // --- Formatos das respostas ---------------------------------------------------

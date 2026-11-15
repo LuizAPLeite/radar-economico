@@ -45,6 +45,9 @@ func (h *handlers) ask(w http.ResponseWriter, r *http.Request) {
 			"o assistente não está ligado neste servidor")
 		return
 	}
+	if !h.allowAsk(w, r) {
+		return
+	}
 
 	var req askRequest
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxAskBody))
