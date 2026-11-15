@@ -275,18 +275,41 @@ Qualidade e clareza importam mais que quantidade de features.
   GIF por `make_gif.py` (Pillow via `uv run --with`, 128 cores por quadro,
   ~0,2 MB). Atualizar as imagens quando as páginas mudarem.
 
-- Segurança, DevSecOps (nov/2026, em andamento; roteiro em `PROMPT-DEVSECOPS.md`,
-  local). Modelo de ameaças em `docs/security/threat-model.md` (achados
-  AM-xx). A API conecta como `radar_api` (migration 000009): só SELECT nas
+## Segurança
+DevSecOps concluído (nov/2026; roteiro em `PROMPT-DEVSECOPS.md`, local).
+Modelo de ameaças em `docs/security/threat-model.md` (achados AM-xx);
+antes e depois em `docs/security/relatorio.md`; `SECURITY.md` na raiz.
+- Banco: a API conecta como `radar_api` (migration 000009): só SELECT nas
   tabelas da mart (no `pipeline_runs`, todas as colunas menos `error`) e
   `SET` no papel `radar_assistant`. Toda tabela nova da mart que a API ou o
   assistente leiam precisa de GRANT explícito ao `radar_api` (e ao
   `radar_assistant`, se for pública) na própria migration; o canário roda a
   API como `radar_api` e falha se faltar. Senha do `radar_api` fora do git:
   em produção, só no Render e em `.env.neon-api` local; no Compose, o
-  serviço `db-users` define `RADAR_API_PASSWORD`. Falhas abertas em produção
-  só são publicadas (docs) junto com a correção. Testes de segurança só
-  contra o nosso próprio sistema.
+  serviço `db-users` define `RADAR_API_PASSWORD`. Coleta e pipeline ainda
+  usam a credencial de dono (AM-02 em parte; risco aceito no relatório).
+- Assistente: `CheckSQL` barra funções que mudam a sessão ou executam outro
+  SQL (`set_config`, `*_to_xml`, `dblink`...), inclusive com aspas, esquema
+  ou `U&`. Limite por IP no `/v1/ask` (`ASK_RATE_LIMIT`/min, padrão 10;
+  `TRUST_PROXY=true` no Render usa o ÚLTIMO item do X-Forwarded-For), além
+  do diário. Texto que vem do LLM e vira HTML passa por `escapeHtml`.
+- Cabeçalhos: API em `httpapi/security.go` (CSP `default-src 'none'`, CORP
+  same-origin, sem CORS); web em `next.config.ts` (CSP sem nonce, com
+  `'unsafe-inline'` aceito; COOP/CORP; sem X-Powered-By). Recurso novo no
+  site (outro domínio, worker, fonte) exige ajustar a CSP.
+- CI: `security.yml` (gitleaks, gosec, govulncheck, bandit, pip-audit, npm
+  audit, Trivy em imagens e configuração, ZAP no Compose) falha em crítico
+  e alto; `codeql.yml`; Dependabot semanal. Falso positivo: suprimir no
+  ponto, com justificativa (`#nosec G404 -- motivo`, `.zap/rules.tsv`), e
+  registrar no relatório. Lint do web com `--max-warnings 0`.
+- Workflows: `permissions: contents: read`; Actions fixadas pelo SHA do
+  commit com a tag em comentário; segredos só nos passos que os usam.
+- Imagens: Go em distroless `:nonroot`; finais sem npm/pip; Go de build
+  fixado no patch (`golang:1.27.4-alpine`, igual ao `go.work`).
+- Pre-commit: `uvx pre-commit install` (gitleaks).
+- Regras: testes de segurança só contra o nosso próprio sistema; falha aberta
+  em produção só é publicada junto com a correção; cada achado é registrado
+  antes de corrigir.
 
 ## Regra de arquitetura
 Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
@@ -305,6 +328,8 @@ Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
 - Fase 5: assistente com LLM (pergunta em português → SQL → resposta + gráfico).
   Concluída (nov/2026).
 - Fase 6: README caprichado, diagrama, GIF de demo.
+  Concluída (nov/2026).
+- DevSecOps: modelo de ameaças, scanners no CI, hardening, relatório.
   Concluída (nov/2026).
 Não avançar de fase sem a anterior estar funcionando.
 

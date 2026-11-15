@@ -9,6 +9,11 @@ português escrevendo o SQL. Tudo em produção, com custo zero.
 [API](https://radar-economico-api.onrender.com/health/data) ·
 [Especificação OpenAPI](https://radar-economico-api.onrender.com/openapi.yaml)
 
+[![CI](https://github.com/LuizAPLeite/radar-economico/actions/workflows/ci.yml/badge.svg)](https://github.com/LuizAPLeite/radar-economico/actions/workflows/ci.yml)
+[![Segurança](https://github.com/LuizAPLeite/radar-economico/actions/workflows/security.yml/badge.svg)](https://github.com/LuizAPLeite/radar-economico/actions/workflows/security.yml)
+[![CodeQL](https://github.com/LuizAPLeite/radar-economico/actions/workflows/codeql.yml/badge.svg)](https://github.com/LuizAPLeite/radar-economico/actions/workflows/codeql.yml)
+[![Canário das fontes](https://github.com/LuizAPLeite/radar-economico/actions/workflows/fontes.yml/badge.svg)](https://github.com/LuizAPLeite/radar-economico/actions/workflows/fontes.yml)
+
 ![Demonstração: a página de indicadores, o mapa de preços da gasolina por município, as análises de repasse do petróleo para a bomba e o assistente respondendo "Qual estado tem o diesel S10 mais caro?" com Acre, R$ 8,305](docs/img/demo.gif)
 
 ## O que dá para ver
@@ -54,6 +59,16 @@ português escrevendo o SQL. Tudo em produção, com custo zero.
   validação do SQL, um papel do Postgres que só lê tabelas públicas e
   transação somente leitura com tempo máximo. Cota grátis protegida por cache
   e limite diário; o provedor fica atrás de uma interface.
+
+**Segurança (DevSecOps)**
+- Modelo de ameaças STRIDE com diagrama; a falha mais grave (fuga do papel do
+  assistente até o dono do banco) foi **demonstrada, corrigida e conferida em
+  produção**, com o antes e depois documentado.
+- A cada push: gitleaks, gosec, govulncheck, bandit, pip-audit, npm audit,
+  Trivy, CodeQL e o **OWASP ZAP** contra o sistema rodando; Dependabot
+  semanal. Achado crítico ou alto falha o CI.
+- Menor privilégio no banco, CSP e cabeçalhos de segurança, limite por IP e
+  Actions fixadas pelo SHA do commit.
 
 **Front-end e produto**
 - Next.js 16 com Server Components (o navegador nunca fala com a API), gráficos
@@ -410,6 +425,27 @@ Sem a chave, o resto do site funciona e o assistente responde que está desligad
 curl.exe -X POST http://localhost:8080/v1/ask -H "Content-Type: application/json" -d '{\"question\": \"Qual estado tem a gasolina mais cara hoje?\"}'
 ```
 
+## Segurança
+
+Segurança entrou no ciclo de desenvolvimento, com o antes e depois
+documentado:
+
+- [Modelo de ameaças](docs/security/threat-model.md): componentes, fronteiras
+  de confiança, análise STRIDE e 14 achados (`AM-01` a `AM-14`).
+- [Relatório](docs/security/relatorio.md): o que cada ferramenta achou, o que
+  foi corrigido e o que foi aceito, e por quê.
+- [Como reportar uma vulnerabilidade](SECURITY.md).
+
+| Camada | Controles |
+|---|---|
+| Código | gosec, govulncheck, bandit, pip-audit, npm audit, ESLint com regras de segurança, CodeQL |
+| Segredos | gitleaks no histórico (CI) e antes de cada commit (`uvx pre-commit install`) |
+| Containers | Trivy nas imagens e na configuração; imagens sem root, sem shell nas de Go e sem npm/pip nas finais |
+| Execução | OWASP ZAP contra o Compose (web e API pela OpenAPI) |
+| Banco | A API conecta como `radar_api`, que só lê a mart; o assistente roda num papel ainda mais restrito |
+| API e site | CSP, cabeçalhos de segurança, sem CORS, limite de perguntas por IP e por dia, erros que não expõem detalhes |
+| CI/CD | `permissions` mínimas, Actions fixadas pelo SHA, segredos só nos passos que precisam, Dependabot |
+
 ## Deploy
 
 Tudo em planos gratuitos, sem cartão de crédito.
@@ -494,3 +530,6 @@ Construído em fases, cada uma funcionando de ponta a ponta antes da seguinte:
 5. **Assistente**: pergunta em português → SQL pelo Gemini → resposta, com
    quatro camadas de proteção.
 6. **Acabamento**: este README, o diagrama e a demonstração.
+7. **DevSecOps**: modelo de ameaças, correção de uma falha alta, scanners
+   de código, dependências, containers e execução no CI, e o
+   [relatório](docs/security/relatorio.md) do antes e depois.

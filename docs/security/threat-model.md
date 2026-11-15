@@ -160,22 +160,25 @@ seção 5.
 
 ## 5. Achados (o "antes")
 
+A situação de cada achado depois das fases 2 a 7, com o motivo dos riscos
+aceitos, está no [relatório de segurança](relatorio.md).
+
 | ID | Risco | STRIDE | Achado | Fase que trata |
 |---|---|---|---|---|
 | AM-01 | **Alto** | E, I | Fuga do papel `radar_assistant` pelo SQL do assistente. **Corrigido em 13/11/2026** (ver abaixo) | Antecipado |
 | AM-02 | **Alto** | E, T, I | Uma credencial de dono do banco para API, coleta, pipeline e máquina local. **Em parte**: a API já não usa a de dono | 2 e 5 |
-| AM-03 | Médio | D | Sem limite de requisições; cota do assistente esgotável por uma pessoa | 5 |
-| AM-04 | Médio | T | XSS provável no tooltip do gráfico do assistente | 5 e 6 |
-| AM-05 | Médio | T, I | Sem cabeçalhos de segurança (CSP e outros) no site e na API | 5 |
-| AM-06 | Médio | T, I, E | Segredo do banco exposto a Actions de terceiros referenciadas por tag | 4 e 5 |
-| AM-07 | Médio | E | Workflows sem `permissions:` explícito | 4 |
-| AM-08 | Baixo | S, T | Coletor da ANP aceita links de qualquer domínio e sem HTTPS | 5 |
-| AM-09 | Baixo | D | Sem limite de descompressão nos arquivos de terceiros | 5 |
-| AM-10 | Baixo | I | A página do assistente não avisa que o Google pode usar as perguntas | 5 |
-| AM-11 | Baixo | I, R | `/health/data` público; logs de curta retenção | 7 (aceitar ou corrigir) |
-| AM-12 | Baixo | I | Credencial de dono em texto puro na máquina local (`.env.neon`) | 2 e 5 |
-| AM-13 | A verificar | S | 2FA nas contas e proteção da branch `main` | 2 (checklist) |
-| AM-14 | Baixo | T | Imagens Docker base por tag, não por digest; sem Dependabot | 4 |
+| AM-03 | Médio | D | Sem limite de requisições; cota do assistente esgotável por uma pessoa. **Corrigido** | 5 |
+| AM-04 | Médio | T | XSS provável no tooltip do gráfico do assistente. **Corrigido** | 5 e 6 |
+| AM-05 | Médio | T, I | Sem cabeçalhos de segurança (CSP e outros) no site e na API. **Corrigido** | 5 |
+| AM-06 | Médio | T, I, E | Segredo do banco exposto a Actions de terceiros referenciadas por tag. **Corrigido** | 4 e 5 |
+| AM-07 | Médio | E | Workflows sem `permissions:` explícito. **Corrigido** | 4 |
+| AM-08 | Baixo | S, T | Coletor da ANP aceita links de qualquer domínio e sem HTTPS. **Corrigido** | 5 |
+| AM-09 | Baixo | D | Sem limite de descompressão nos arquivos de terceiros. **Aceito** | 5 |
+| AM-10 | Baixo | I | A página do assistente não avisa que o Google pode usar as perguntas. **Corrigido** | 5 |
+| AM-11 | Baixo | I, R | `/health/data` público; logs de curta retenção. **Aceito** | 7 (aceitar ou corrigir) |
+| AM-12 | Baixo | I | Credencial de dono em texto puro na máquina local (`.env.neon`). **Aceito** | 2 e 5 |
+| AM-13 | A verificar | S | 2FA nas contas e proteção da branch `main`. **Checklist** no relatório | 2 (checklist) |
+| AM-14 | Baixo | T | Imagens Docker base por tag, não por digest; sem Dependabot. **Corrigido** | 4 |
 
 ### AM-01: fuga do papel `radar_assistant` (alto, confirmado)
 
