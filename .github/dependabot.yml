@@ -1,0 +1,33 @@
+# Dependabot: abre PRs de atualização sozinho, uma vez por semana. Os de
+# segurança chegam assim que o GitHub publica o alerta. Cada PR passa pelo CI.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directories: [/collector, /api]
+    schedule: { interval: weekly }
+    groups:
+      go: { patterns: ["*"] }
+
+  - package-ecosystem: uv
+    directory: /pipeline
+    schedule: { interval: weekly }
+    groups:
+      python: { patterns: ["*"] }
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule: { interval: weekly }
+    groups:
+      web: { patterns: ["*"] }
+
+  - package-ecosystem: docker
+    directories: [/collector, /api, /pipeline, /web]
+    schedule: { interval: weekly }
+
+  # As Actions estão fixadas pelo SHA do commit (uma tag pode ser movida
+  # para outro código); o Dependabot troca o SHA quando sai versão nova.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ["*"] }

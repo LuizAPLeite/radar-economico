@@ -1,0 +1,113 @@
+name: Segurança
+
+# Scanners de segurança do próprio repositório. Falham o workflow em achados
+# CRÍTICOS e ALTOS (os médios e baixos são tratados no relatório:
+# docs/security/relatorio.md). Rodam a cada push e PR e uma vez por semana,
+# porque vulnerabilidades novas aparecem em dependências que não mudaram.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 9 * * 1" # segunda, 6h de Brasília
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    name: Segredos (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0 # o histórico inteiro, não só o último commit
+      - name: gitleaks no histórico
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 \
+            git /repo --redact --no-banner --exit-code 1
+
+  go:
+    name: Go (gosec, govulncheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "**/go.sum"
+      # govulncheck: dependências (e a própria biblioteca padrão) com
+      # vulnerabilidade conhecida, mas só as que o código de fato chama.
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+          for m in collector api; do (cd "$m" && govulncheck ./...); done
+      # gosec: padrões inseguros no código (SQL montado com texto, arquivos
+      # com permissão aberta, TLS sem verificação...). Falha nos de
+      # severidade alta; os falsos positivos levam #nosec com justificativa.
+      - name: gosec
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.30.0
+          for m in collector api; do (cd "$m" && gosec -quiet -severity high ./...); done
+
+  python:
+    name: Python (bandit, pip-audit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pipeline
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      # bandit: padrões inseguros no Python (SQL com f-string, subprocess
+      # com shell, pickle...). Falha a partir de severidade média.
+      - name: bandit
+        run: uvx bandit@1.8.6 -r src -q --severity-level medium
+      # pip-audit: as versões travadas no uv.lock contra a base de
+      # vulnerabilidades do Python (PyPA).
+      - name: pip-audit
+        run: |
+          uv export --locked --no-dev --no-hashes --no-emit-project -o "$RUNNER_TEMP/req.txt"
+          uvx pip-audit@2.9.0 -r "$RUNNER_TEMP/req.txt" --disable-pip --no-deps
+
+  web:
+    name: Web (npm audit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 26
+      # Lê só o package-lock.json: não precisa instalar nada. As regras de
+      # segurança do ESLint rodam no CI, com o lint.
+      - run: npm audit --audit-level=high
+
+  trivy:
+    name: Imagens e configuração (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build das imagens
+        run: for c in api collector pipeline web; do docker build -q -t "radar-$c:scan" "./$c"; done
+      # Pacotes do sistema e bibliotecas dentro de cada imagem. --ignore-unfixed:
+      # só conta o que já tem correção publicada (o resto não temos como trocar).
+      - name: Vulnerabilidades nas imagens
+        run: |
+          for c in api collector pipeline web; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.76.2 \
+              image --quiet --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "radar-$c:scan"
+          done
+      # Erros de configuração em Dockerfiles, Compose e workflows.
+      - name: Configuração
+        run: |
+          docker run --rm -v "$PWD:/repo:ro" aquasec/trivy:0.76.2 \
+            config --quiet --severity HIGH,CRITICAL --exit-code 1 \
+              --skip-dirs /repo/web/node_modules --skip-dirs /repo/web/.next /repo

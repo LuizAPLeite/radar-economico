@@ -17,6 +17,10 @@ concurrency:
   group: data-production
   cancel-in-progress: false
 
+# Só leitura do código: nenhum job aqui precisa escrever no repositório.
+permissions:
+  contents: read
+
 jobs:
   collect:
     name: Migrations, coleta e pipeline
@@ -25,14 +29,16 @@ jobs:
     # A primeira coleta da ANP (12 meses, servidor lento) leva vários minutos;
     # as seguintes, incrementais, poucos.
     timeout-minutes: 30
-    env:
-      # Connection string DIRETA do Neon (sem "-pooler"), cadastrada em
-      # Settings → Secrets and variables → Actions. O GitHub esconde o valor nos logs.
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    # A credencial do banco (connection string DIRETA do Neon, sem "-pooler",
+    # em Settings → Secrets and variables → Actions) só entra nos passos que
+    # falam com o banco, e não no job inteiro: as Actions de terceiros
+    # (setup-go, setup-uv) não a recebem. O GitHub esconde o valor nos logs.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Confere o secret
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           if [ -z "$DATABASE_URL" ]; then
             echo "::error::Cadastre o secret DATABASE_URL em Settings → Secrets and variables → Actions."
@@ -40,11 +46,13 @@ jobs:
           fi
 
       - name: Migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           docker run --rm -v "$PWD/db/migrations:/migrations:ro" \
             migrate/migrate:v4.18.3 -path=/migrations -database="$DATABASE_URL" up
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.work
           cache-dependency-path: "**/go.sum"
@@ -54,9 +62,10 @@ jobs:
       - name: Coleta (BCB, ANP, série da ANP e Brent)
         run: go run ./collector
         env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           COLLECTOR_SOURCES: bcb_sgs,anp,anp_serie,fred
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           enable-cache: true
       # Roda mesmo se a coleta de alguma fonte falhou: as outras podem ter
@@ -64,4 +73,6 @@ jobs:
       - name: Pipeline (raw → staging → mart)
         if: ${{ !cancelled() }}
         working-directory: pipeline
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: uv run --locked --no-dev radar-pipeline

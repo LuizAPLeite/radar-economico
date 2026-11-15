@@ -1,0 +1,10 @@
+# Ganchos que rodam antes de cada commit, na máquina de quem desenvolve.
+# Instalar uma vez, na raiz do repositório:
+#   uvx pre-commit install
+# O gitleaks olha só o que está sendo commitado e recusa o commit se achar
+# uma chave, senha ou token. O CI repete a varredura no histórico inteiro.
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks

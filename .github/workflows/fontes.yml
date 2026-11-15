@@ -27,6 +27,10 @@ concurrency:
   group: canario-fontes
   cancel-in-progress: true
 
+# Só leitura do código: nenhum job aqui precisa escrever no repositório.
+permissions:
+  contents: read
+
 jobs:
   canary:
     name: Coleta, pipeline e API contra as fontes reais
@@ -48,14 +52,14 @@ jobs:
     env:
       DATABASE_URL: postgres://radar:radar@localhost:5432/radar?sslmode=disable
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Migrations
         run: |
           docker run --rm --network host -v "$PWD/db/migrations:/migrations:ro" \
             migrate/migrate:v4.18.3 -path=/migrations -database="$DATABASE_URL" up
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.work
           cache-dependency-path: "**/go.sum"
@@ -86,7 +90,7 @@ jobs:
             SELECT ibge_code, name, uf, latitude, longitude FROM staging.municipalities
              WHERE latitude IS NOT NULL AND longitude IS NOT NULL"
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           enable-cache: true
       - name: Pipeline (raw → staging → mart)

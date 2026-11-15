@@ -36,3 +36,9 @@ services:
       # guardadas no cache não contam).
       - key: ASSISTANT_DAILY_LIMIT
         value: "400"
+      # Limite por IP (perguntas por minuto). O Render fica na frente da API e
+      # acrescenta o IP de quem conectou no fim do X-Forwarded-For.
+      - key: ASK_RATE_LIMIT
+        value: "10"
+      - key: TRUST_PROXY
+        value: "true"
