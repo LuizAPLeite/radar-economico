@@ -1,6 +1,6 @@
 # Mesmo padrão do collector: compila numa imagem com Go e copia só o
 # binário estático para uma imagem mínima, sem shell.
-FROM golang:1.27-alpine AS build
+FROM golang:1.27.4-alpine AS build
 WORKDIR /src
 
 COPY go.mod go.sum ./

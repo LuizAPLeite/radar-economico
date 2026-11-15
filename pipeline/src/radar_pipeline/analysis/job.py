@@ -8,6 +8,7 @@ from datetime import datetime
 
 import polars as pl
 import psycopg
+from psycopg import sql
 
 from radar_pipeline import runs
 from radar_pipeline.analysis import correlation, forecast
@@ -25,6 +26,12 @@ INPUT_JOBS = ("bcb", "fred", "anp_serie")
 # Produtos analisados (série oficial da ANP): o diesel comum tem histórico
 # desde 2004; o S10, desde 2013.
 PRODUCTS = ("gasolina", "etanol", "diesel", "diesel_s10")
+
+
+def _identifier(table: str) -> sql.Identifier:
+    """'mart.x' vira o identificador "mart"."x", escapado pelo psycopg."""
+    return sql.Identifier(*table.split("."))
+
 
 _TABLES = (
     "mart.fuel_forecasts",
@@ -206,12 +213,14 @@ def _write(
     with conn.transaction(), conn.cursor() as cur:
         # A ordem respeita as chaves estrangeiras: quem referencia sai antes.
         for table in _TABLES:
-            cur.execute(f"DELETE FROM {table}")  # nomes fixos, não vêm de fora
+            cur.execute(sql.SQL("DELETE FROM {}").format(_identifier(table)))
         copy_frame(cur, ("mart", "analysis_regimes"), regimes)
         for table, (frame, cols) in columns.items():
             if not frame.is_empty():
                 copy_frame(cur, ("mart", table), frame.select(cols))
-        cur.execute(f"ANALYZE {', '.join(_TABLES)}")
+        cur.execute(
+            sql.SQL("ANALYZE {}").format(sql.SQL(", ").join(_identifier(t) for t in _TABLES))
+        )
 
 
 def _log_product(product: str, best: dict[str, int], result: forecast.Result) -> None:

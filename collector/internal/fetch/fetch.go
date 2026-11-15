@@ -115,6 +115,8 @@ func (c *Client) get(ctx context.Context, url string) (body []byte, retry bool, 
 // (jitter), para que downloads em paralelo não repitam todos no mesmo instante.
 func Backoff(base time.Duration, attempt int) time.Duration {
 	d := base << (attempt - 1)
+	// #nosec G404 -- o sorteio só espalha as novas tentativas no tempo; não
+	// protege nada, então não precisa de crypto/rand.
 	return d + time.Duration(rand.Int64N(int64(d)/5+1))
 }
 

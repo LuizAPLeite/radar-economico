@@ -1,6 +1,6 @@
 # Build em duas etapas: a primeira tem o compilador Go; a segunda só leva o
 # binário, resultando numa imagem pequena e sem shell (menos superfície de ataque).
-FROM golang:1.27-alpine AS build
+FROM golang:1.27.4-alpine AS build
 WORKDIR /src
 
 # Copia go.mod/go.sum antes do código: o Docker reaproveita a camada de

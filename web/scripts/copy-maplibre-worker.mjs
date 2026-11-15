@@ -7,6 +7,8 @@
 // sozinho. O arquivo copiado não vai para o git (está no .gitignore).
 //
 // Roda sozinho antes do `npm run dev` e do `npm run build` (predev/prebuild).
+// Caminhos fixos, calculados abaixo (nenhum vem de fora do script).
+/* eslint-disable security/detect-non-literal-fs-filename */
 import { copyFile, mkdir } from "node:fs/promises";
 
 const source = new URL(import.meta.resolve("maplibre-gl/dist/maplibre-gl-worker.mjs"));
