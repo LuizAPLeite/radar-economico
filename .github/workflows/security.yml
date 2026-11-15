@@ -111,3 +111,26 @@ jobs:
           docker run --rm -v "$PWD:/repo:ro" aquasec/trivy:0.76.2 \
             config --quiet --severity HIGH,CRITICAL --exit-code 1 \
               --skip-dirs /repo/web/node_modules --skip-dirs /repo/web/.next /repo
+
+  # DAST: o OWASP ZAP visita o sistema rodando, como um navegador, e procura
+  # problemas que só aparecem em execução (cabeçalhos, cookies, respostas).
+  # Só contra o nosso próprio Compose, em localhost. Os avisos aceitos ficam
+  # em .zap/rules.tsv, cada um com o motivo; os demais falham o job.
+  dast:
+    name: DAST (OWASP ZAP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Sobe banco, API e web pelo Compose
+        run: |
+          docker compose up -d --build postgres api web
+          curl -sf --retry 30 --retry-connrefused --retry-delay 2 localhost:3000 > /dev/null
+      - name: ZAP baseline no web
+        run: |
+          docker run --rm --network radar-economico_default -v "$PWD/.zap:/zap/wrk:rw" -u root \
+            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t http://web:3000 -m 2 -c rules.tsv
+      - name: ZAP na API (pela spec OpenAPI)
+        run: |
+          docker run --rm --network radar-economico_default -v "$PWD/.zap:/zap/wrk:rw" -u root \
+            ghcr.io/zaproxy/zaproxy:stable zap-api-scan.py -t http://api:8080/openapi.yaml -f openapi -c rules.tsv

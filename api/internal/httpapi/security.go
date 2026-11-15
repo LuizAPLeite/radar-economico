@@ -25,7 +25,7 @@ func securityHeaders(next http.Handler) http.Handler {
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
 		h.Set("Referrer-Policy", "no-referrer")
-		h.Set("Cross-Origin-Resource-Policy", "same-site")
+		h.Set("Cross-Origin-Resource-Policy", "same-origin")
 		h.Set("Strict-Transport-Security", "max-age=31536000")
 		next.ServeHTTP(w, r)
 	})

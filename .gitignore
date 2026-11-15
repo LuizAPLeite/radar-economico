@@ -33,3 +33,7 @@ Thumbs.db
 
 # Quadros do GIF de demonstração (docs/scripts)
 docs/scripts/frames/
+
+# Arquivos gerados pelo ZAP ao rodar (.zap/ guarda só as regras)
+.zap/*
+!.zap/rules.tsv

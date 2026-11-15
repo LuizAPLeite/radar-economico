@@ -1,0 +1,5 @@
+10055	IGNORE	(CSP: unsafe-inline) aceito: o Next injeta scripts inline; nonce obrigaria renderizar toda página a cada visita. Ver docs/security/relatorio.md.
+10202	IGNORE	(Anti-CSRF) falso positivo: o formulário do assistente é uma Server Action, e o Next recusa POST com Origin diferente do Host.
+90004	IGNORE	(COEP) aceito: o site não precisa de isolamento entre origens (SharedArrayBuffer); COOP e CORP estão definidos.
+10049	IGNORE	(Non-Storable Content) informativo: páginas dinâmicas sem cache, de propósito.
+10031	IGNORE	(Potential XSS) falso positivo: os campos são os ids internos da Server Action; o React escapa todo texto.
