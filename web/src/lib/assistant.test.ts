@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 
 import type { Answer } from "./api.ts";
 import {
+  escapeHtml,
   chartData,
   columnLabel,
   dateGranularity,
@@ -133,5 +134,17 @@ describe("gráfico", () => {
     assert.equal(chartData(answer({ rows: [] })), null);
     assert.equal(chartData(answer({ chart: { type: "bar", x: "nada", y: ["preco"] } })), null);
     assert.equal(chartData(answer({ chart: { type: "bar", x: "mes", y: ["uf"] } })), null); // y de texto
+  });
+});
+
+describe("escapeHtml", () => {
+  test("neutraliza HTML vindo do SQL do LLM (AM-04)", () => {
+    assert.equal(
+      escapeHtml(`<img src=x onerror="alert(1)">`),
+      "&#60;img src=x onerror=&#34;alert(1)&#34;&#62;",
+    );
+  });
+  test("texto comum passa igual", () => {
+    assert.equal(escapeHtml("Roraima (RR)"), "Roraima (RR)");
   });
 });

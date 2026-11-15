@@ -155,3 +155,12 @@ export function chartData(answer: Answer): ChartData | null {
     omitted,
   };
 }
+
+/**
+ * Escapa texto para inserir em HTML: & < > " ' viram entidades. Para o que
+ * vem de fora (aqui, do SQL escrito pelo LLM) e vai para o tooltip do ECharts,
+ * que monta HTML com o texto.
+ */
+export function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+}

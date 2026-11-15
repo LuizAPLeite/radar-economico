@@ -1,6 +1,6 @@
 import type { EChartsOption } from "echarts";
 
-import { formatDateAs, withStateName, type ChartData } from "@/lib/assistant";
+import { escapeHtml, formatDateAs, withStateName, type ChartData } from "@/lib/assistant";
 import type { ChartColors } from "../chart-option";
 
 const number = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 3 });
@@ -83,10 +83,12 @@ export function buildAssistantOption(data: ChartData, title: string, colors: Cha
           return (
             `<div style="display:flex;align-items:baseline;gap:8px">` +
             `<span style="font-weight:600;font-size:15px">${v === null ? "—" : number.format(v)}</span>` +
-            `<span style="color:${colors.ink2}">${s.name}</span></div>`
+            `<span style="color:${colors.ink2}">${escapeHtml(s.name)}</span></div>`
           );
         });
-        return rows.join("") + `<div style="color:${colors.ink2}">${label(data.x[i] ?? "")}</div>`;
+        // Nomes de colunas e valores do eixo vêm do SQL que o LLM escreveu, e
+        // o ECharts insere o tooltip como HTML: escapar sempre (achado AM-04).
+        return rows.join("") + `<div style="color:${colors.ink2}">${escapeHtml(label(data.x[i] ?? ""))}</div>`;
       },
     },
     series: data.series.map((s, k) => {
