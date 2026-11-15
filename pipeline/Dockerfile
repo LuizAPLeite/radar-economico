@@ -1,5 +1,5 @@
 # Etapa 1: instala as dependências num ambiente virtual com o uv.
-FROM python:3.13-slim AS build
+FROM python:3.15-slim AS build
 COPY --from=ghcr.io/astral-sh/uv:0.13.7 /uv /bin/uv
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 \
@@ -17,7 +17,7 @@ COPY src ./src
 RUN uv sync --locked --no-dev --no-editable
 
 # Etapa 2: imagem final, sem o uv e sem o código-fonte solto.
-FROM python:3.13-slim
+FROM python:3.15-slim
 # Correções de segurança do Debian (ex.: zlib) e sem o pip do sistema: o
 # programa roda do .venv, e o pip traz bibliotecas próprias (urllib3,
 # msgpack) que o Trivy acusa e que nunca seriam usadas aqui.
