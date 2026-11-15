@@ -10,6 +10,9 @@ COPY . .
 RUN CGO_ENABLED=0 GOWORK=off go build -trimpath -ldflags="-s -w" -o /out/api .
 
 FROM gcr.io/distroless/static-debian12:nonroot
+# A imagem :nonroot já roda sem root; o USER explícito deixa isso claro para
+# quem lê (e para o Trivy).
+USER nonroot:nonroot
 COPY --from=build /out/api /api
 EXPOSE 8080
 ENTRYPOINT ["/api"]

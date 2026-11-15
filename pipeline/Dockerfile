@@ -18,7 +18,10 @@ RUN uv sync --locked --no-dev --no-editable
 
 # Etapa 2: imagem final, sem o uv e sem o código-fonte solto.
 FROM python:3.13-slim
-RUN useradd --create-home --uid 10001 app
+# Correções de segurança do Debian (ex.: zlib) e sem o pip do sistema: o
+# programa roda do .venv, e o pip traz bibliotecas próprias (urllib3,
+# msgpack) que o Trivy acusa e que nunca seriam usadas aqui.
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*     && python -m pip uninstall -y pip setuptools wheel     && useradd --create-home --uid 10001 app
 COPY --from=build /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1

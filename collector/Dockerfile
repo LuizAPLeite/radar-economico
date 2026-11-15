@@ -14,5 +14,8 @@ RUN CGO_ENABLED=0 GOWORK=off go build -trimpath -ldflags="-s -w" -o /out/collect
 
 # distroless/static: só certificados TLS (para HTTPS) e um usuário sem privilégios.
 FROM gcr.io/distroless/static-debian12:nonroot
+# A imagem :nonroot já roda sem root; o USER explícito deixa isso claro para
+# quem lê (e para o Trivy).
+USER nonroot:nonroot
 COPY --from=build /out/collector /collector
 ENTRYPOINT ["/collector"]
