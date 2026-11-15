@@ -125,7 +125,7 @@ jobs:
       - name: Sobe banco, API e web pelo Compose
         run: |
           docker compose up -d --build postgres api web
-          curl -sf --retry 30 --retry-connrefused --retry-delay 2 localhost:3000 > /dev/null
+          curl -sf --retry 40 --retry-all-errors --retry-delay 3 localhost:3000 > /dev/null
       - name: ZAP baseline no web
         run: |
           docker run --rm --network radar-economico_default -v "$PWD/.zap:/zap/wrk:rw" -u root \
