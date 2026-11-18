@@ -30,7 +30,7 @@ export function WeeklyChartPanel({ fuelName, unit, national, state }: Props) {
   const rows = national.slice(-TABLE_ROWS).reverse();
 
   return (
-    <figure className="mt-10 rounded-xl border border-hairline bg-surface p-5">
+    <figure className="mt-10 rounded-md border border-hairline bg-surface p-5">
       <figcaption className="mb-3">
         <div className="flex items-baseline justify-between gap-4">
           <h2 className="text-base font-semibold text-ink">{fuelName}: preço médio por semana</h2>

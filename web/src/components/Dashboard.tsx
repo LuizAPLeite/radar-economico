@@ -38,7 +38,7 @@ export async function Dashboard() {
 
   return (
     <>
-      <section aria-label="Valores mais recentes" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section aria-label="Valores mais recentes" className="grid gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
         {indicators.map((indicator, k) => (
           <IndicatorCard key={indicator.id} card={buildCard(indicator, series[k])} />
         ))}
@@ -53,7 +53,7 @@ export async function Dashboard() {
 
 function EmptyState() {
   return (
-    <div className="rounded-xl border border-hairline bg-surface p-6">
+    <div className="rounded-md border border-hairline bg-surface p-6">
       <h2 className="font-semibold text-ink">Ainda não há dados</h2>
       <p className="mt-2 text-sm text-ink-2">
         A API está no ar, mas a mart está vazia. Rode o coletor e o pipeline:{" "}
@@ -70,16 +70,16 @@ export function DashboardSkeleton() {
       <p role="status" className="sr-only">
         Carregando os indicadores…
       </p>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
         {DISPLAY_ORDER.map((id) => (
-          <div key={id} className="h-40 animate-pulse rounded-xl border border-hairline bg-surface" />
+          <div key={id} className="mx-4 h-40 animate-pulse rounded-sm bg-hover" />
         ))}
       </div>
       <div className="mt-10 grid gap-4">
         {DISPLAY_ORDER.map((id) => (
           <div
             key={id}
-            className="animate-pulse rounded-xl border border-hairline bg-surface"
+            className="animate-pulse rounded-md border border-hairline bg-surface"
             style={{ height: CHART_HEIGHT + 100 }}
           />
         ))}

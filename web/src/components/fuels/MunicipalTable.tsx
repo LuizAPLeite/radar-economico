@@ -21,7 +21,7 @@ export function MunicipalTable({ data, month }: { data: MunicipalPrice[]; month:
   return (
     <details
       onToggle={(e) => setOpen(e.currentTarget.open)}
-      className="mt-4 rounded-xl border border-hairline bg-surface p-5 text-sm"
+      className="mt-4 rounded-md border border-hairline bg-surface p-5 text-sm"
     >
       <summary className="cursor-pointer text-ink-2 hover:text-ink">
         Ver os {formatNumber(data.length, 0)} municípios de {formatMonth(month)} em tabela

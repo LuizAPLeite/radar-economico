@@ -26,7 +26,7 @@ export function ChartPanel({ series, start, end }: { series: ChartSeries; start:
   const recent = visible.slice(-TABLE_ROWS).reverse();
 
   return (
-    <figure className="rounded-xl border border-hairline bg-surface p-5">
+    <figure className="rounded-md border border-hairline bg-surface p-5">
       <figcaption className="mb-3 flex items-baseline justify-between gap-4">
         <h3 className="text-base font-semibold text-ink">{series.name}</h3>
         <span className="text-sm text-ink-2">{series.unit}</span>

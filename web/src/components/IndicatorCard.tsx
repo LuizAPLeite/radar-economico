@@ -11,9 +11,10 @@ const ARROWS = { up: "▲", down: "▼" } as const;
  */
 export function IndicatorCard({ card }: { card: Card }) {
   return (
-    <article className="rounded-xl border border-hairline bg-surface p-5">
-      <h2 className="text-sm font-medium text-ink-2">{card.label}</h2>
-      <p className="mt-2 text-3xl font-semibold tracking-tight text-ink">{card.value}</p>
+    // Um painel de totem: colunas separadas por um fio, sem caixa em volta.
+    <article className="border-hairline sm:border-l sm:px-5 sm:first:border-l-0 sm:first:pl-0">
+      <h3 className="text-sm font-medium text-ink-2">{card.label}</h3>
+      <p className="figure mt-3 text-[clamp(2.75rem,5vw,3.75rem)] font-semibold whitespace-nowrap text-ink">{card.value}</p>
       <p className="mt-1 text-sm text-ink-2">{card.context}</p>
       {card.detail && (
         <p className="mt-3 text-sm text-ink">

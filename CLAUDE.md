@@ -78,7 +78,8 @@ Qualidade e clareza importam mais que quantidade de features.
   traz `available_months`), `/v1/fuels/{id}/pass-through` (períodos,
   correlações por defasagem e móvel), `/v1/fuels/{id}/forecast` (modelo,
   base_week, previsão com faixa de 80%, backtests e as últimas 104 semanas da
-  série oficial; null/vazio sem previsão), `/openapi.yaml` (spec embutida com
+  série oficial; null/vazio sem previsão), `/v1/fuels/{id}/history` (série
+  oficial semanal inteira, desde 2004), `/openapi.yaml` (spec embutida com
   go:embed).
   Erros sempre `{"error":{"code","message"}}`; 500 nunca expõe o erro interno.
 - `/health/data`: idade do dado mais recente de cada conjunto (selic, usd_brl,
@@ -274,6 +275,22 @@ Qualidade e clareza importam mais que quantidade de features.
   por `docs/scripts/shoot.mjs` (Edge headless via CDP, roteiros em JSON) e o
   GIF por `make_gif.py` (Pillow via `uv run --with`, 128 cores por quadro,
   ~0,2 MB). Atualizar as imagens quando as páginas mudarem.
+
+- Identidade visual "papel-moeda" (nov/2026, guiada pela skill
+  frontend-design): papel `#edf0ea`, tinta `#1b2420`, destaque verde-cédula
+  `--accent` (`#3f7d5c`; escuro `#7fb896`), linhas de cédula `--guilloche`;
+  séries e mapa seguem na paleta validada. Fonte única Archivo (next/font,
+  eixo `wdth`); classe `.figure` (largura 72%, algarismos tabulares) para
+  números grandes de totem. Sem cards arredondados com sombra: indicadores
+  em colunas separadas por fio; botões `rounded-sm`, selecionado em
+  `bg-accent`; menu com sublinhado. Movimento: um único efeito automático, a
+  linha do tempo da home (`components/home/PriceTimeline.tsx`): seção de
+  260vh com conteúdo `sticky`, a rolagem percorre as médias mensais da série
+  oficial da gasolina (mês pelo índice, não pelo comprimento do traço);
+  mouse/toque/setas inspecionam qualquer mês (`role="slider"`);
+  `prefers-reduced-motion` mostra a linha inteira e parada; tabela por ano
+  ao lado. Se a série falhar, a home segue sem ela. Hover só onde revela
+  dado; nada de "card que pula".
 
 ## Segurança
 DevSecOps concluído (nov/2026; roteiro em `PROMPT-DEVSECOPS.md`, local).

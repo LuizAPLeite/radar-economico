@@ -173,6 +173,12 @@ export async function getPassThrough(id: string): Promise<PassThrough> {
   return getJSON<PassThrough>(`/v1/fuels/${encodeURIComponent(id)}/pass-through`);
 }
 
+/** Série oficial semanal da ANP no Brasil, desde 2004. */
+export async function getFuelHistory(id: string): Promise<WeekPrice[]> {
+  const body = await getJSON<{ prices: WeekPrice[] }>(`/v1/fuels/${encodeURIComponent(id)}/history`);
+  return body.prices;
+}
+
 export async function getForecast(id: string): Promise<Forecast> {
   return getJSON<Forecast>(`/v1/fuels/${encodeURIComponent(id)}/forecast`);
 }

@@ -334,7 +334,7 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <figure className="mt-8 rounded-xl border border-hairline bg-surface p-5">
+    <figure className="mt-8 rounded-md border border-hairline bg-surface p-5">
       <figcaption className="mb-3">
         <h2 className="text-base font-semibold text-ink">{title}</h2>
         <p className="mt-1 text-sm text-ink-2">{subtitle}</p>
@@ -389,7 +389,7 @@ function DataTable({ summary, head, rows }: { summary: string; head: string[]; r
 
 function EmptyState() {
   return (
-    <div className="mt-6 rounded-xl border border-hairline bg-surface p-6">
+    <div className="mt-6 rounded-md border border-hairline bg-surface p-6">
       <h2 className="font-semibold text-ink">Ainda não há análises</h2>
       <p className="mt-2 text-sm text-ink-2">
         A API está no ar, mas o job de análise ainda não rodou. Colete a série da ANP e o Brent e rode o pipeline:{" "}
@@ -401,7 +401,7 @@ function EmptyState() {
 
 /** Mostrado enquanto os dados chegam: mesmo tamanho do conteúdo, para a página não pular. */
 export function AnalysisSkeleton() {
-  const block = "animate-pulse rounded-xl border border-hairline bg-surface";
+  const block = "animate-pulse rounded-md border border-hairline bg-surface";
   return (
     <div aria-busy="true">
       <p role="status" className="sr-only">

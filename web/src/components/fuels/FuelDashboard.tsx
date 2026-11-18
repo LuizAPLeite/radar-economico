@@ -60,7 +60,7 @@ export async function FuelDashboard({ searchParams }: { searchParams: Promise<Se
     <FuelFiltersProvider filters={{ ...filters, month: unknownMonth ? null : filters.month }}>
       <FuelControls fuels={fuels.map((f) => ({ id: f.id, label: fuelLabel(f) }))} />
       <PendingArea>
-        <section aria-label="Resumo" className="mt-6 grid gap-4 sm:grid-cols-3">
+        <section aria-label="Resumo" className="mt-6 grid gap-y-6 sm:grid-cols-3">
           {cards.map((card) => (
             <IndicatorCard key={card.id} card={card} />
           ))}
@@ -103,7 +103,7 @@ export async function FuelDashboard({ searchParams }: { searchParams: Promise<Se
 
 function EmptyState() {
   return (
-    <div className="rounded-xl border border-hairline bg-surface p-6">
+    <div className="rounded-md border border-hairline bg-surface p-6">
       <h2 className="font-semibold text-ink">Ainda não há dados de combustíveis</h2>
       <p className="mt-2 text-sm text-ink-2">
         A API está no ar, mas a mart está vazia. Rode o coletor e o pipeline:{" "}
@@ -115,14 +115,14 @@ function EmptyState() {
 
 /** Mostrado enquanto os dados chegam: mesmo tamanho do conteúdo, para a página não pular. */
 export function FuelsSkeleton() {
-  const block = "animate-pulse rounded-xl border border-hairline bg-surface";
+  const block = "animate-pulse rounded-md border border-hairline bg-surface";
   return (
     <div aria-busy="true">
       <p role="status" className="sr-only">
         Carregando os preços dos combustíveis…
       </p>
       <div className="h-8 w-full max-w-xl animate-pulse rounded-full bg-hover" />
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+      <div className="mt-6 grid gap-y-6 sm:grid-cols-3">
         {[1, 2, 3].map((i) => (
           <div key={i} className={`h-40 ${block}`} />
         ))}

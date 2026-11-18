@@ -35,7 +35,7 @@ export function FuelMapPanel({ municipalities, scale, month, availableMonths, uf
   const selected = filters.month ?? latest;
 
   return (
-    <figure className={`rounded-xl border border-hairline bg-surface p-5 ${className}`}>
+    <figure className={`rounded-md border border-hairline bg-surface p-5 ${className}`}>
       <figcaption className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-base font-semibold text-ink">Preço médio por município</h2>
         {availableMonths.length > 0 && (

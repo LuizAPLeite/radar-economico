@@ -19,7 +19,7 @@ export default function ErrorPage({ error, retry }: { error: unknown; retry: () 
 
   return (
     <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:py-12">
-      <div role="alert" className="rounded-xl border border-hairline bg-surface p-6">
+      <div role="alert" className="rounded-md border border-hairline bg-surface p-6">
         <h1 className="text-lg font-semibold text-ink">Não foi possível carregar os dados</h1>
         <p className="mt-2 text-ink-2">
           A API do Radar Econômico não respondeu. Costuma ser passageiro; tente de novo em instantes.
@@ -27,7 +27,7 @@ export default function ErrorPage({ error, retry }: { error: unknown; retry: () 
         <button
           type="button"
           onClick={() => retry()}
-          className="mt-5 rounded-full bg-ink px-4 py-2 text-sm font-medium text-page hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-series"
+          className="mt-5 rounded-sm bg-ink px-4 py-2 text-sm font-medium text-page hover:opacity-90"
         >
           Tentar de novo
         </button>

@@ -20,7 +20,7 @@ export function SiteNav() {
   return (
     <nav aria-label="Páginas">
       {/* flex-wrap: no celular, os links que não cabem descem para a linha de baixo. */}
-      <ul className="flex flex-wrap gap-1">
+      <ul className="flex flex-wrap gap-x-3">
         {LINKS.map(({ href, label }) => {
           const current = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
@@ -28,10 +28,13 @@ export function SiteNav() {
               <Link
                 href={href}
                 aria-current={current ? "page" : undefined}
+                // A página atual ganha um fio grosso embaixo; as outras, um fio
+                // fino ao passar o mouse.
                 className={
-                  "block rounded-full px-3 py-1.5 text-sm transition-colors focus-visible:outline-2 " +
-                  "focus-visible:outline-offset-2 focus-visible:outline-series " +
-                  (current ? "bg-hover font-medium text-ink" : "text-ink-2 hover:bg-hover hover:text-ink")
+                  "block border-b-2 px-2 py-1.5 text-sm transition-colors " +
+                  (current
+                    ? "border-accent font-medium text-ink"
+                    : "border-transparent text-ink-2 hover:border-hairline hover:text-ink")
                 }
               >
                 {label}

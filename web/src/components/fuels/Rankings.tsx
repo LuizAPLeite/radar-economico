@@ -13,7 +13,7 @@ interface Props {
 /** Os municípios mais baratos e os mais caros do mês, no recorte escolhido. */
 export function Rankings({ cheapest, priciest, scopeName, month, className = "" }: Props) {
   return (
-    <section aria-labelledby="rankings-title" className={`rounded-xl border border-hairline bg-surface p-5 ${className}`}>
+    <section aria-labelledby="rankings-title" className={`rounded-md border border-hairline bg-surface p-5 ${className}`}>
       <h2 id="rankings-title" className="text-base font-semibold text-ink">
         Mais baratos e mais caros
       </h2>

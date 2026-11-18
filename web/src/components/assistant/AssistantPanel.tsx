@@ -54,7 +54,7 @@ export function AssistantPanel() {
           type="submit"
           disabled={pending}
           className={
-            "rounded-lg bg-ink px-4 py-2 text-sm font-medium text-page transition-opacity disabled:opacity-50 " +
+            "rounded-sm bg-ink px-4 py-2 text-sm font-medium text-page transition-opacity disabled:opacity-50 " +
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-series"
           }
         >
@@ -82,7 +82,7 @@ export function AssistantPanel() {
 
       <div aria-busy={pending} className={"mt-8 transition-opacity " + (pending ? "opacity-50" : "")}>
         {state.error && (
-          <div className="rounded-xl border border-hairline bg-surface p-5 text-ink">
+          <div className="rounded-md border border-hairline bg-surface p-5 text-ink">
             <p>{state.error}</p>
           </div>
         )}
@@ -103,7 +103,7 @@ function AnswerView({ answer }: { answer: Answer }) {
 
   if (!answer.answerable) {
     return (
-      <section className="rounded-xl border border-hairline bg-surface p-5">
+      <section className="rounded-md border border-hairline bg-surface p-5">
         <h2 className="text-base font-semibold text-ink">{answer.title}</h2>
         <p className="mt-2 text-ink-2">{answer.explanation}</p>
       </section>
@@ -112,7 +112,7 @@ function AnswerView({ answer }: { answer: Answer }) {
 
   const rows = showAll ? answer.rows : answer.rows.slice(0, TABLE_PREVIEW);
   return (
-    <figure className="rounded-xl border border-hairline bg-surface p-5">
+    <figure className="rounded-md border border-hairline bg-surface p-5">
       <figcaption>
         <h2 className="text-base font-semibold text-ink">{answer.title}</h2>
         <p className="mt-1 text-sm text-ink-2">{answer.explanation}</p>
