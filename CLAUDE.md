@@ -328,6 +328,24 @@ antes e depois em `docs/security/relatorio.md`; `SECURITY.md` na raiz.
   em produção só é publicada junto com a correção; cada achado é registrado
   antes de corrigir.
 
+## Privacidade e conformidade (LGPD)
+- Sem cookies, analytics, pixels ou rastreamento (conferido nas respostas do
+  site e da API): por isso não há banner de consentimento. Se algum dia entrar
+  algo assim, o consentimento vem ANTES, e a `/privacidade` muda junto.
+- Páginas `/privacidade` e `/termos` (componente `LegalPage`), com links no
+  rodapé comum do layout. Projeto pessoal sem venda: sem política de
+  reembolso nem dados de empresa; o controlador é o mantenedor (perfil do
+  GitHub). Mudou o que o site trata (dado novo, provedor novo)? Atualizar a
+  política e a data no topo.
+- Minimização: o log da API não guarda o texto das perguntas
+  (`questionRef`: tamanho + SHA-256 curto); o IP só fica na memória do
+  limitador (1 min); perguntas em cache por 24 h, na memória.
+- Acessibilidade: axe-core sem violações (WCAG 2.1 A/AA + boas práticas) nas
+  6 páginas em nov/2026; contraste AA nos tokens (`--muted` e `--accent` do
+  claro escurecidos); link "Pular para o conteúdo"; um `<main>` por página
+  envolvendo título e rodapé da página (cabeçalho e rodapé do site são os
+  únicos landmarks banner/contentinfo).
+
 ## Regra de arquitetura
 Coletor e pipeline NÃO se chamam diretamente: eles se comunicam pelo banco
 (raw → staging → mart). A API só lê `mart`.

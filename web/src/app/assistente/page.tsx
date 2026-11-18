@@ -14,20 +14,20 @@ export const metadata: Metadata = {
  */
 export default function AssistantPage() {
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-10 sm:py-12">
-      <header className="mb-8">
+    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-10 sm:py-12">
+      <div className="mb-8">
         <h1 className="text-3xl font-semibold tracking-tight text-ink">Pergunte aos dados</h1>
         <p className="mt-2 max-w-2xl text-ink-2">
           Faça uma pergunta em português sobre a Selic, o IPCA, o dólar, o petróleo ou o preço dos combustíveis. Um
           modelo de linguagem escreve a consulta SQL, e a resposta vem direto do banco do Radar Econômico.
         </p>
-      </header>
+      </div>
 
-      <main className="flex-1">
+      <div className="flex-1">
         <AssistantPanel />
-      </main>
+      </div>
 
-      <footer className="mt-12 border-t border-hairline pt-6 text-sm text-ink-2">
+      <div className="mt-12 border-t border-hairline pt-6 text-sm text-ink-2">
         <p>
           Como funciona: o Gemini (Google) transforma a pergunta em SQL; a API confere a consulta e a executa num
           acesso somente leitura, restrito às tabelas públicas do painel, com tempo máximo. O modelo pode errar ao
@@ -41,7 +41,7 @@ export default function AssistantPage() {
           </a>
           .
         </p>
-      </footer>
-    </div>
+      </div>
+    </main>
   );
 }

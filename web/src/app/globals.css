@@ -17,12 +17,12 @@
   --surface: #f6f8f3;
   --ink: #1b2420;
   --ink-2: #45524b;
-  --muted: #7b8780;
+  --muted: #626e67; /* 4,6:1 sobre o papel (WCAG AA) */
   --hairline: rgba(27, 36, 32, 0.14);
   --grid: #dce2da;
   --axis: #b9c3bb;
   --hover-wash: rgba(27, 36, 32, 0.06);
-  --accent: #3f7d5c;
+  --accent: #38734f; /* 4,9:1 sobre o papel e com o papel por cima */
   --guilloche: #9aa89f;
   --series-1: #2a78d6;
   --series-negative: #e34948;

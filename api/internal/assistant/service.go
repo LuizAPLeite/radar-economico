@@ -2,6 +2,7 @@ package assistant
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -107,20 +108,20 @@ func (s *Service) Ask(ctx context.Context, question string) (Answer, error) {
 	if plan.Answerable {
 		sql, err := CheckSQL(plan.SQL)
 		if err != nil {
-			s.logger.Warn("SQL do assistente recusado", "question", question, "sql", plan.SQL, "err", err)
+			s.logger.Warn("SQL do assistente recusado", "question", questionRef(question), "sql", plan.SQL, "err", err)
 			return Answer{}, fmt.Errorf("%w: %w", ErrBadPlan, err)
 		}
 		result, err := s.executor.Run(ctx, sql)
 		if err != nil {
 			// Ex.: coluna que não existe, permissão negada, tempo esgotado.
-			s.logger.Warn("SQL do assistente falhou", "question", question, "sql", sql, "err", err)
+			s.logger.Warn("SQL do assistente falhou", "question", questionRef(question), "sql", sql, "err", err)
 			return Answer{}, fmt.Errorf("%w: %w", ErrBadPlan, err)
 		}
 		answer.SQL = sql
 		answer.Columns, answer.Rows, answer.Truncated = result.Columns, result.Rows, result.Truncated
 		answer.Chart = checkChart(plan.Chart, result.Columns, len(result.Rows))
 	}
-	s.logger.Info("pergunta respondida", "question", question, "answerable", answer.Answerable,
+	s.logger.Info("pergunta respondida", "question", questionRef(question), "answerable", answer.Answerable,
 		"rows", len(answer.Rows), "chart", answer.Chart.Type)
 
 	s.answers.Set(key, answer)
@@ -175,4 +176,12 @@ func checkChart(c ChartSpec, cols []Column, rows int) ChartSpec {
 		}
 	}
 	return c
+}
+
+// questionRef identifica a pergunta nos logs sem guardar o texto, que pode ter
+// dados pessoais (LGPD: só o necessário): o tamanho e os primeiros caracteres
+// do SHA-256. Dá para ver que a mesma pergunta se repetiu, não o que ela diz.
+func questionRef(question string) string {
+	sum := sha256.Sum256([]byte(question))
+	return fmt.Sprintf("%d caracteres, sha256 %x", utf8.RuneCountInString(question), sum[:6])
 }

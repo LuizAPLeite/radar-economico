@@ -17,22 +17,22 @@ export const metadata: Metadata = {
  */
 export default function FuelsPage({ searchParams }: PageProps<"/combustiveis">) {
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-10 sm:py-12">
-      <header className="mb-8">
+    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-10 sm:py-12">
+      <div className="mb-8">
         <h1 className="text-3xl font-semibold tracking-tight text-ink">Preços dos combustíveis</h1>
         <p className="mt-2 max-w-2xl text-ink-2">
           O preço médio nas bombas, da pesquisa semanal da ANP em milhares de postos: no Brasil, em cada estado e em
           cada município pesquisado.
         </p>
-      </header>
+      </div>
 
-      <main className="flex-1">
+      <div className="flex-1">
         <Suspense fallback={<FuelsSkeleton />}>
           <FuelDashboard searchParams={searchParams} />
         </Suspense>
-      </main>
+      </div>
 
-      <footer className="mt-12 border-t border-hairline pt-6 text-sm text-ink-2">
+      <div className="mt-12 border-t border-hairline pt-6 text-sm text-ink-2">
         Fontes: ANP, Levantamento de Preços de Combustíveis (série histórica de preços de revenda); IBGE, municípios
         e malha dos estados. Código aberto no{" "}
         <a
@@ -42,7 +42,7 @@ export default function FuelsPage({ searchParams }: PageProps<"/combustiveis">) 
           GitHub
         </a>
         .
-      </footer>
-    </div>
+      </div>
+    </main>
   );
 }
