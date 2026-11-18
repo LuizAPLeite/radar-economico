@@ -91,6 +91,12 @@ antes e depois estão no [modelo de ameaças](threat-model.md#am-01-fuga-do-pape
 - **`security/detect-object-injection` desligada.** Acusava todo
   `obj[chave]` (45 avisos, todos com chaves tipadas ou de listas fixas). O
   CodeQL cobre poluição de protótipo com análise de fluxo de verdade.
+- **Alertas em dependências de desenvolvimento do web (npm).** Em
+  18/11/2026 saiu um alerta alto no `picomatch` (ReDoS, todas as versões,
+  sem correção), que chega só pelo ESLint. O CI passou a bloquear por
+  `npm audit --omit=dev` (o que vai para o site e para a imagem) e a
+  avisar pelas de desenvolvimento, que rodam só na máquina de quem
+  desenvolve e no CI, com entradas do próprio repositório.
 - **Limite por IP atrás de proxies.** O site chama a API pelo servidor da
   Vercel, então as perguntas feitas pelo site dividem os IPs da Vercel.
   Com o tráfego atual isso não pesa, e o limite diário continua valendo

@@ -15,7 +15,31 @@
    "wait": 1000
   },
   {
-   "frame": 2200
+   "frame": 1600
+  },
+  {
+   "scrollTo": 400
+  },
+  {
+   "frame": 900
+  },
+  {
+   "scrollTo": 800
+  },
+  {
+   "frame": 900
+  },
+  {
+   "scrollTo": 1030
+  },
+  {
+   "frame": 1600
+  },
+  {
+   "scrollTo": 1300
+  },
+  {
+   "frame": 1400
   },
   {
    "scrollTo": "figure"

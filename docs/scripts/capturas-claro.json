@@ -14,8 +14,13 @@
    "wait": 1500
   },
   {
-   "shot": "docs/img/inicio.png",
-   "height": 1050
+   "scrollTo": 1030
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "shot": "docs/img/inicio.png"
   },
   {
    "goto": "https://radar-economico-phi.vercel.app/combustiveis"

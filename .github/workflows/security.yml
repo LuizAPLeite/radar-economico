@@ -88,7 +88,17 @@ jobs:
           node-version: 26
       # Lê só o package-lock.json: não precisa instalar nada. As regras de
       # segurança do ESLint rodam no CI, com o lint.
-      - run: npm audit --audit-level=high
+      # Bloqueia pelas dependências que vão para produção. As de
+      # desenvolvimento (ESLint, TypeScript) não entram na imagem nem no site:
+      # um alerta nelas vira aviso, e o Dependabot traz a correção quando sair.
+      - name: Dependências de produção
+        run: npm audit --omit=dev --audit-level=high
+      - name: Dependências de desenvolvimento (só aviso)
+        run: |
+          if ! npm audit --audit-level=high > "$RUNNER_TEMP/audit.txt"; then
+            echo "::warning::npm audit: alerta alto em dependência de desenvolvimento (não vai para produção)"
+            cat "$RUNNER_TEMP/audit.txt"
+          fi
 
   trivy:
     name: Imagens e configuração (Trivy)
