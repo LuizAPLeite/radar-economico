@@ -194,6 +194,35 @@ func (h *handlers) getForecast(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+// historyResponse é a série oficial da ANP inteira de um combustível.
+type historyResponse struct {
+	Fuel   fuelJSON        `json:"fuel"`
+	Prices []weekPriceJSON `json:"prices"`
+}
+
+// getOfficialHistory responde GET /v1/fuels/{id}/history: a média semanal
+// oficial da ANP no Brasil, desde 2004. Vazia para combustíveis sem série
+// oficial (GNV antes de existir na planilha, por exemplo).
+func (h *handlers) getOfficialHistory(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	fuel, ok := h.getFuel(w, r, id)
+	if !ok {
+		return
+	}
+	prices, err := h.store.ListOfficialFuelPrices(r.Context(), db.ListOfficialFuelPricesParams{
+		ProductID: id, FromDate: MinDate, ToDate: MaxDate,
+	})
+	if err != nil {
+		h.internalError(w, r, err)
+		return
+	}
+	resp := historyResponse{Fuel: fuelFromModel(fuel), Prices: make([]weekPriceJSON, 0, len(prices))}
+	for _, p := range prices {
+		resp.Prices = append(resp.Prices, newWeekPrice(p.WeekStart, p.AvgPrice, p.NStations))
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
 // optionalDate formata a data como AAAA-MM-DD, ou devolve nil (null no JSON).
 func optionalDate(t time.Time, valid bool) *string {
 	if !valid {

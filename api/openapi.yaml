@@ -383,6 +383,36 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /v1/fuels/{id}/history:
+    get:
+      operationId: getFuelHistory
+      summary: Série oficial da ANP, semana a semana, desde 2004
+      description: |
+        Média semanal oficial da ANP no Brasil (Levantamento de Preços de
+        Combustíveis), do início da série até a semana mais recente.
+        Vazia para combustíveis sem série oficial.
+      parameters:
+        - $ref: "#/components/parameters/FuelID"
+      responses:
+        "200":
+          description: Série oficial completa
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [fuel, prices]
+                properties:
+                  fuel:
+                    $ref: "#/components/schemas/Fuel"
+                  prices:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/WeekPrice"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /v1/ask:
     post:
       operationId: ask
