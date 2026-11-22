@@ -34,7 +34,7 @@ jobs:
     # falam com o banco, e não no job inteiro: as Actions de terceiros
     # (setup-go, setup-uv) não a recebem. O GitHub esconde o valor nos logs.
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Confere o secret
         env:
@@ -52,7 +52,7 @@ jobs:
           docker run --rm -v "$PWD/db/migrations:/migrations:ro" \
             migrate/migrate:v4.18.3 -path=/migrations -database="$DATABASE_URL" up
 
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.work
           cache-dependency-path: "**/go.sum"
@@ -65,7 +65,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           COLLECTOR_SOURCES: bcb_sgs,anp,anp_serie,fred
 
-      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
           enable-cache: true
       # Roda mesmo se a coleta de alguma fonte falhou: as outras podem ter
