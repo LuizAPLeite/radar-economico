@@ -52,6 +52,12 @@ jobs:
           docker run --rm -v "$PWD/db/migrations:/migrations:ro" \
             migrate/migrate:v4.18.3 -path=/migrations -database="$DATABASE_URL" up
 
+      # As ferramentas são instaladas ANTES da coleta: se uma fonte falhar, o
+      # passo seguinte é pulado, e o pipeline (que roda mesmo assim) ficaria
+      # sem o uv. Foi o que travou a produção de 20 a 25/11/2026.
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          enable-cache: true
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.work
@@ -65,9 +71,6 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           COLLECTOR_SOURCES: bcb_sgs,anp,anp_serie,fred
 
-      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
-        with:
-          enable-cache: true
       # Roda mesmo se a coleta de alguma fonte falhou: as outras podem ter
       # trazido dados novos, e cada job do pipeline só lê o que deu certo.
       - name: Pipeline (raw → staging → mart)

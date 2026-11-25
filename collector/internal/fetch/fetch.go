@@ -42,8 +42,13 @@ type Client struct {
 // NewClient cria um Client com o timeout dado para cada requisição inteira
 // (incluindo baixar o corpo).
 func NewClient(logger *slog.Logger, timeout time.Duration) *Client {
+	// O gov.br (ANP) às vezes demora a fechar a conexão segura vinda dos
+	// servidores do GitHub, nos EUA: o padrão de 10 s para o TLS estourava
+	// (nov/2026). 30 s dá margem sem mudar o tempo total da requisição.
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSHandshakeTimeout = 30 * time.Second
 	return &Client{
-		HTTPClient:   &http.Client{Timeout: timeout},
+		HTTPClient:   &http.Client{Timeout: timeout, Transport: transport},
 		Logger:       logger,
 		MaxRetries:   3,
 		BaseBackoff:  2 * time.Second,
