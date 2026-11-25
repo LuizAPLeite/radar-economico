@@ -65,11 +65,27 @@ jobs:
       # O IBGE fica de fora: ele recusa conexões vindas de fora do Brasil, e os
       # servidores do Actions ficam nos EUA. Os municípios quase nunca mudam;
       # são carregados a partir de uma máquina no Brasil (ver o README, Deploy).
-      - name: Coleta (BCB, ANP, série da ANP e Brent)
+      - name: Coleta (BCB e Brent)
         run: go run ./collector
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          COLLECTOR_SOURCES: bcb_sgs,anp,anp_serie,fred
+          COLLECTOR_SOURCES: bcb_sgs,fred
+
+      # Desde 20/11/2026 o gov.br derruba as conexões vindas do Actions (como o
+      # IBGE já fazia). A coleta da ANP continua sendo tentada todo dia, mas a
+      # falha vira AVISO, não erro: o /health/data acusa quando os dados da ANP
+      # passarem do prazo. Coletar de uma máquina no Brasil resolve (README).
+      - name: Coleta (ANP e série da ANP; bloqueio vira aviso)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: |
+          if ! go run ./collector; then
+            echo "::warning::A ANP recusou a conexão vinda do GitHub; os dados da ANP não foram atualizados hoje."
+            exit 1
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          COLLECTOR_SOURCES: anp,anp_serie
 
       # Roda mesmo se a coleta de alguma fonte falhou: as outras podem ter
       # trazido dados novos, e cada job do pipeline só lê o que deu certo.

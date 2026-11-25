@@ -146,6 +146,14 @@ Qualidade e clareza importam mais que quantidade de features.
 - O IBGE recusa conexões vindas de fora do Brasil (o Actions roda nos EUA:
   dial tcp timeout). Municípios em produção: carregar a partir de uma máquina
   no Brasil (comando no README, Deploy); mudam quase nunca.
+- Desde 20/11/2026 a ANP (gov.br) também derruba as conexões do Actions
+  (connection reset by peer). Decisão do usuário: só avisar por ora. No
+  `data.yml` e no canário, a coleta da ANP roda num passo separado com
+  `continue-on-error`: a falha vira `::warning::` e o resto segue; o canário,
+  sem a ANP, roda o pipeline só com `bcb,fred` e confere só os conjuntos do
+  BCB e do Brent. O `/health/data` acusa quando a ANP passar do prazo.
+  Ferramentas (setup-uv, setup-go) ficam ANTES de qualquer passo que possa
+  falhar: um passo pulado depois de uma falha travou o pipeline de 20 a 25/11.
 - Canário `fontes.yml`: diário às 7h30, também roda quando o próprio arquivo
   muda. Postgres temporário, coleta real de BCB, ANP (só 2 meses), série da
   ANP e FRED, municípios do retrato `.github/canario/municipios.csv.gz`

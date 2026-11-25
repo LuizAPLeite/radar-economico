@@ -68,15 +68,33 @@ jobs:
       # para conferir o formato dos arquivos isso basta.
       # Os erros do coletor (logs em JSON) viram anotações: aparecem no topo da
       # página da execução, sem precisar abrir o log inteiro.
-      - name: Coleta das fontes reais
+      - name: Coleta das fontes reais (BCB e Brent)
+        run: |
+          set +e
+          COLLECTOR_SOURCES=bcb_sgs,fred go run ./collector 2>&1 | tee collector.log
+          status=${PIPESTATUS[0]}
+          set -e
+          grep '"level":"ERROR"' collector.log | jq -r '"::error::\(.msg): \(.err // "")"' | cut -c1-900 || true
+          exit "$status"
+
+      # Desde 20/11/2026 o gov.br derruba as conexões vindas do Actions. Se a
+      # ANP recusar, o canário segue só com o que conseguiu conferir e deixa
+      # um AVISO (não um erro): mudança de formato da ANP só aparece nos dias
+      # em que ela aceitar a conexão.
+      - name: Coleta das fontes reais (ANP; bloqueio vira aviso)
+        id: anp
+        continue-on-error: true
         run: |
           export ANP_START_MONTH=$(date -u -d "$(date -u +%Y-%m-01) -2 months" +%Y-%m)
           echo "ANP a partir de $ANP_START_MONTH"
           set +e
-          COLLECTOR_SOURCES=bcb_sgs,anp,anp_serie,fred go run ./collector 2>&1 | tee collector.log
+          COLLECTOR_SOURCES=anp,anp_serie go run ./collector 2>&1 | tee collector-anp.log
           status=${PIPESTATUS[0]}
           set -e
-          grep '"level":"ERROR"' collector.log | jq -r '"::error::\(.msg): \(.err // "")"' | cut -c1-900 || true
+          if [ "$status" != 0 ]; then
+            grep '"level":"ERROR"' collector-anp.log | jq -r '"::warning::\(.msg): \(.err // "")"' | cut -c1-500 || true
+            echo "::warning::A ANP recusou a conexão; o canário conferiu só BCB, Brent e a API."
+          fi
           exit "$status"
 
       # No lugar do job do IBGE: as mesmas tabelas que ele grava.
@@ -95,7 +113,12 @@ jobs:
           enable-cache: true
       - name: Pipeline (raw → staging → mart)
         working-directory: pipeline
-        run: PIPELINE_JOBS=bcb,fred,anp,anp_serie,analysis uv run --locked --no-dev radar-pipeline
+        env:
+          ANP_OK: ${{ steps.anp.outcome == 'success' }}
+        run: |
+          jobs=bcb,fred
+          if [ "$ANP_OK" = true ]; then jobs=bcb,fred,anp,anp_serie,analysis; fi
+          PIPELINE_JOBS=$jobs uv run --locked --no-dev radar-pipeline
 
       # A API de verdade, sobre a mart recém-carregada: /health/data responde
       # 200 só se todos os conjuntos estão em dia e nenhum job falhou; e a
@@ -103,6 +126,8 @@ jobs:
       # A API roda como radar_api, com as permissões de produção: se faltar
       # uma permissão a uma tabela nova da mart, o canário falha aqui.
       - name: API e saúde dos dados
+        env:
+          ANP_OK: ${{ steps.anp.outcome == 'success' }}
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "ALTER ROLE radar_api LOGIN PASSWORD 'canario'"
           go build -o "$RUNNER_TEMP/api" ./api
@@ -117,6 +142,18 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           jq . health.json
+          # Sem a ANP (bloqueio), os conjuntos dela ficam vazios e o /health/data
+          # responde 503 por isso: confere só os do BCB e do Brent.
+          if [ "$ANP_OK" != true ]; then
+            bad=$(jq -r '[.datasets[] | select(.id == "selic" or .id == "usd_brl" or .id == "ipca" or .id == "brent") | select(.status != "ok") | .id] | join(", ")' health.json)
+            if [ -n "$bad" ]; then
+              echo "::error::conjuntos fora do prazo ou vazios: $bad"
+              cat "$RUNNER_TEMP/api.log"
+              exit 1
+            fi
+            echo "ANP bloqueada: conferidos só BCB e Brent (previsão não conferida)." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           if [ "$status" != "200" ]; then
             echo "::error::/health/data respondeu $status"
             cat "$RUNNER_TEMP/api.log"
